@@ -1,0 +1,1505 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>How LLMs Work</title>
+<meta name="description" content="A plain-language guide to what a large language model does when it writes an answer: tokens, next-token prediction, context windows, training, temperature and hallucination.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+  /* ---------- Tokens ---------- */
+  :root {
+    color-scheme: light;
+    --bg: #F5F6FB;
+    --surface: #FFFFFF;
+    --surface-2: #ECEEF8;
+    --ink: #1A1D33;
+    --ink-2: #4A4F6A;
+    --ink-3: #7A7F9A;
+    --line: #D9DCEC;
+    --accent: #3B4FE0;
+    --accent-ink: #2B3BB3;
+    --accent-soft: #E3E7FF;
+    --good: #0E9E8A;
+    --good-soft: #D6F4EE;
+    --bad: #E0544C;
+    --bad-soft: #FCE3E1;
+    --judge: #C8820A;
+    --judge-soft: #FFF0D2;
+    --human: #8A4FD6;
+    --human-soft: #EEE4FF;
+    --code-bg: #1C1F3A;
+    --code-ink: #E8EAF6;
+    --shadow: 0 1px 2px rgba(26,29,51,.06), 0 8px 24px rgba(26,29,51,.06);
+    --radius: 14px;
+    --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+    --body: "Atkinson Hyperlegible", "Helvetica Neue", Arial, system-ui, sans-serif;
+    --mono: "JetBrains Mono", "SFMono-Regular", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #0F1120;
+      --surface: #171A2E;
+      --surface-2: #1F2340;
+      --ink: #E8EAF6;
+      --ink-2: #B7BBD3;
+      --ink-3: #8A8FAB;
+      --line: #2C3050;
+      --accent: #8B9BFF;
+      --accent-ink: #A9B5FF;
+      --accent-soft: #262F5E;
+      --good: #35D6BF;
+      --good-soft: #113C36;
+      --bad: #FF847C;
+      --bad-soft: #4A201D;
+      --judge: #FFB84D;
+      --judge-soft: #4A3610;
+      --human: #BC98FF;
+      --human-soft: #34245A;
+      --code-bg: #0B0D1A;
+      --code-ink: #E8EAF6;
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #0F1120;
+    --surface: #171A2E;
+    --surface-2: #1F2340;
+    --ink: #E8EAF6;
+    --ink-2: #B7BBD3;
+    --ink-3: #8A8FAB;
+    --line: #2C3050;
+    --accent: #8B9BFF;
+    --accent-ink: #A9B5FF;
+    --accent-soft: #262F5E;
+    --good: #35D6BF;
+    --good-soft: #113C36;
+    --bad: #FF847C;
+    --bad-soft: #4A201D;
+    --judge: #FFB84D;
+    --judge-soft: #4A3610;
+    --human: #BC98FF;
+    --human-soft: #34245A;
+    --code-bg: #0B0D1A;
+    --code-ink: #E8EAF6;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
+  }
+
+  /* ---------- Base ---------- */
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 17px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3, h4 { font-family: var(--display); line-height: 1.15; text-wrap: balance; margin: 0; }
+  h1 { font-size: clamp(2.2rem, 5vw, 3.6rem); font-weight: 800; letter-spacing: -.02em; }
+  h2 { font-size: clamp(1.6rem, 3vw, 2.2rem); font-weight: 800; letter-spacing: -.015em; }
+  h3 { font-size: 1.25rem; font-weight: 700; margin-top: 1.6rem; }
+  h4 { font-size: 1.05rem; font-weight: 700; }
+  p { margin: .8rem 0; max-width: 68ch; }
+  ul, ol { max-width: 68ch; padding-left: 1.3rem; }
+  li { margin: .35rem 0; }
+  a { color: var(--accent-ink); }
+  strong { font-weight: 700; }
+  code { font-family: var(--mono); font-size: .88em; background: var(--surface-2); padding: .1em .4em; border-radius: 6px; }
+  pre { background: var(--code-bg); color: var(--code-ink); padding: 1.1rem 1.2rem; border-radius: var(--radius); overflow-x: auto; font-family: var(--mono); font-size: .86rem; line-height: 1.55; margin: 1rem 0; }
+  pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
+  .cm { color: #9BA3D6; }
+  .kw { color: #FFB84D; }
+  .st { color: #7FE3D0; }
+  .fn { color: #B4C1FF; }
+  button { font: inherit; }
+  :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+  /* ---------- Progress bar ---------- */
+  .progress { position: fixed; top: env(safe-area-inset-top, 0px); left: 0; height: 4px; width: 0%; background: var(--accent); z-index: 50; transition: width .15s linear; }
+
+  /* ---------- Layout ---------- */
+  .page { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; max-width: 1240px; margin: 0 auto; padding-inline: 16px; }
+  .toc { min-width: 0; position: sticky; top: env(safe-area-inset-top, 0px); z-index: 40; background: var(--bg); padding-block: 10px; border-bottom: 1px solid var(--line); }
+  .toc-inner { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: thin; padding-bottom: 4px; }
+  .toc-inner a { flex: 0 0 auto; text-decoration: none; color: var(--ink-2); font-size: .82rem; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); white-space: nowrap; font-family: var(--display); font-weight: 500; }
+  .toc-inner a.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .toc-inner a .n { opacity: .6; margin-right: 4px; }
+  main { padding-block: 24px 80px; min-width: 0; }
+  @media (min-width: 1000px) {
+    .page { grid-template-columns: 250px minmax(0, 1fr); gap: 48px; }
+    .toc { align-self: start; top: calc(env(safe-area-inset-top, 0px) + 24px); border-bottom: 0; padding-block: 0; margin-top: 28px; }
+    .toc-inner { flex-direction: column; gap: 2px; overflow: visible; }
+    .toc-inner a { background: none; border: 0; border-left: 3px solid transparent; border-radius: 0; padding: 7px 12px; white-space: normal; }
+    .toc-inner a.active { background: var(--accent-soft); color: var(--accent-ink); border-left-color: var(--accent); }
+  }
+
+  /* ---------- Header ---------- */
+  .hero { padding-block: 24px 12px; }
+  .eyebrow { font-family: var(--display); text-transform: uppercase; letter-spacing: .14em; font-size: .72rem; color: var(--accent-ink); font-weight: 700; }
+  .hero .lead { font-size: 1.15rem; color: var(--ink-2); max-width: 62ch; }
+  .topbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding-block: 12px; border-bottom: 1px solid var(--line); }
+  .brand { font-family: var(--display); font-weight: 800; letter-spacing: -.01em; }
+  .theme-btn { border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 999px; padding: 6px 14px; cursor: pointer; font-size: .85rem; }
+  .theme-btn:hover { border-color: var(--accent); }
+
+  /* Learning path stepper */
+  .path { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-block: 20px 8px; }
+  .path a { text-decoration: none; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: block; transition: transform .15s ease, border-color .15s ease; }
+  .path a:hover { transform: translateY(-2px); border-color: var(--accent); }
+  .path .step { font-family: var(--mono); font-size: .7rem; color: var(--accent-ink); font-weight: 600; }
+  .path .name { font-family: var(--display); font-weight: 700; font-size: .95rem; display: block; margin-top: 2px; }
+
+  /* ---------- Chapters ---------- */
+  .chapter { padding-block: 44px 8px; border-top: 1px solid var(--line); margin-top: 32px; scroll-margin-top: 80px; }
+  .chapter:first-of-type { border-top: 0; margin-top: 0; }
+  .chapter-head { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+  .chapter .goal { color: var(--ink-2); font-size: 1.05rem; max-width: 66ch; }
+
+  /* Boxes */
+  .box { border-radius: var(--radius); padding: 16px 18px; margin: 18px 0; max-width: 78ch; border: 1px solid var(--line); background: var(--surface); }
+  .box p:first-of-type { margin-top: .3rem; }
+  .box p:last-child { margin-bottom: .2rem; }
+  .box .label { font-family: var(--display); text-transform: uppercase; letter-spacing: .12em; font-size: .7rem; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; }
+  .analogy { background: var(--judge-soft); border-color: transparent; }
+  .analogy .label { color: var(--judge); }
+  .key { background: var(--accent-soft); border-color: transparent; }
+  .key .label { color: var(--accent-ink); }
+  .doubt { background: var(--surface); border-left: 4px solid var(--human); }
+  .doubt .label { color: var(--human); }
+  .warn { background: var(--bad-soft); border-color: transparent; }
+  .warn .label { color: var(--bad); }
+  .tip { background: var(--good-soft); border-color: transparent; }
+  .tip .label { color: var(--good); }
+
+  details.deeper { border: 1px dashed var(--line); border-radius: var(--radius); padding: 0 18px; margin: 18px 0; max-width: 78ch; background: var(--surface); }
+  details.deeper summary { cursor: pointer; padding: 14px 0; font-family: var(--display); font-weight: 700; color: var(--accent-ink); list-style: none; display: flex; align-items: center; gap: 10px; }
+  details.deeper summary::-webkit-details-marker { display: none; }
+  details.deeper summary::before { content: "+"; display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--accent-soft); font-size: 1rem; }
+  details.deeper[open] summary::before { content: "–"; }
+  details.deeper > :not(summary) { margin-bottom: 14px; }
+
+  /* Cards */
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin: 16px 0; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .card h4 { margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
+  .card p { font-size: .93rem; color: var(--ink-2); margin: .3rem 0; }
+  .card .ex { font-family: var(--mono); font-size: .78rem; color: var(--ink-3); }
+  .chip { display: inline-block; font-family: var(--display); font-size: .7rem; font-weight: 700; letter-spacing: .04em; padding: 2px 8px; border-radius: 999px; background: var(--surface-2); color: var(--ink-2); }
+  .chip.good { background: var(--good-soft); color: var(--good); }
+  .chip.bad { background: var(--bad-soft); color: var(--bad); }
+  .chip.judge { background: var(--judge-soft); color: var(--judge); }
+  .chip.accent { background: var(--accent-soft); color: var(--accent-ink); }
+  .chip.human { background: var(--human-soft); color: var(--human); }
+
+  /* Diagrams */
+  .diagram { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; margin: 18px 0; overflow-x: auto; }
+  .diagram svg { display: block; min-width: 640px; width: 100%; height: auto; }
+  .diagram.narrow svg { min-width: 0; max-width: 560px; margin: 0 auto; }
+  .diagram .cap { font-size: .85rem; color: var(--ink-3); margin: 10px 4px 0; max-width: none; }
+  .svg-text { font-family: var(--display); font-weight: 700; fill: var(--ink); }
+  .svg-sub { font-family: var(--mono); font-size: 11px; fill: var(--ink-3); }
+  .svg-box { fill: var(--surface-2); stroke: var(--line); }
+  .svg-line { stroke: var(--ink-3); fill: none; }
+
+  /* Exam mapping */
+  .mapping { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin: 16px 0; }
+  .map { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; text-align: center; }
+  .map .from { font-family: var(--display); font-weight: 700; font-size: 1rem; }
+  .map .eq { color: var(--ink-3); font-size: .8rem; margin: 4px 0; }
+  .map .to { display: inline-block; background: var(--accent-soft); color: var(--accent-ink); font-family: var(--display); font-weight: 700; padding: 3px 10px; border-radius: 999px; font-size: .9rem; }
+  .map .icon { font-size: 1.6rem; line-height: 1; }
+
+  /* Compare two columns */
+  .vs { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin: 16px 0; max-width: 80ch; }
+  .vs > div { border-radius: 12px; padding: 14px 16px; }
+  .vs .l { background: var(--bad-soft); }
+  .vs .r { background: var(--good-soft); }
+  .vs h4 { margin-bottom: 6px; }
+  .vs ul { padding-left: 1.1rem; margin: 0; font-size: .95rem; }
+
+  /* Spectrum */
+  .spectrum { margin: 20px 0; }
+  .spectrum .bar { height: 12px; border-radius: 999px; background: linear-gradient(90deg, var(--good), var(--accent), var(--human)); }
+  .spectrum .ends { display: flex; justify-content: space-between; font-family: var(--display); font-weight: 700; font-size: .85rem; margin-top: 6px; }
+  .spectrum .items { display: flex; justify-content: space-between; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .spectrum .items span { font-size: .8rem; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; }
+
+  /* Ladder of graders */
+  .ladder { display: grid; gap: 10px; margin: 16px 0; }
+  .rung { display: grid; grid-template-columns: 44px 1fr; gap: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; align-items: start; }
+  .rung .num { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; font-family: var(--display); font-weight: 800; color: #fff; background: var(--accent); }
+  .rung h4 { margin-bottom: 2px; }
+  .rung p { font-size: .95rem; margin: .3rem 0; }
+  .rung .meters { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 8px; font-size: .75rem; color: var(--ink-3); font-family: var(--display); font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
+  .meter { display: inline-flex; align-items: center; gap: 6px; }
+  .meter i { display: inline-block; width: 70px; height: 6px; border-radius: 999px; background: var(--surface-2); position: relative; overflow: hidden; }
+  .meter i::after { content: ""; position: absolute; inset: 0; width: var(--v); background: var(--accent); border-radius: 999px; }
+  .meter.cost i::after { background: var(--judge); }
+
+  /* Tables */
+  .tbl { overflow-x: auto; margin: 16px 0; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: .93rem; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-family: var(--display); font-weight: 700; background: var(--surface-2); font-size: .82rem; text-transform: uppercase; letter-spacing: .06em; }
+  tr:last-child td { border-bottom: 0; }
+  td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+  /* Playground */
+  .play { background: var(--surface); border: 2px solid var(--accent-soft); border-radius: var(--radius); padding: 18px; margin: 20px 0; }
+  .play .label { color: var(--accent-ink); }
+  .play h4 { margin: 6px 0 10px; }
+  .field { display: grid; gap: 4px; margin: 10px 0; }
+  .field label { font-size: .82rem; font-family: var(--display); font-weight: 700; color: var(--ink-2); }
+  .field input, .field textarea { font: inherit; font-size: .95rem; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); width: 100%; }
+  .field input:focus, .field textarea:focus { border-color: var(--accent); }
+  .results { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-top: 12px; }
+  .res { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--bg); }
+  .res .name { font-family: var(--display); font-weight: 700; font-size: .85rem; }
+  .res .val { font-family: var(--mono); font-size: 1.3rem; font-weight: 600; font-variant-numeric: tabular-nums; margin: 4px 0; }
+  .res .why { font-size: .78rem; color: var(--ink-3); }
+  .res.pass .val { color: var(--good); }
+  .res.fail .val { color: var(--bad); }
+  .grid4 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; max-width: 420px; }
+  .grid4 .field { margin: 0; }
+  .btn { background: var(--accent); color: #fff; border: 0; border-radius: 10px; padding: 9px 16px; font-family: var(--display); font-weight: 700; cursor: pointer; }
+  .btn.ghost { background: var(--surface-2); color: var(--ink); }
+  .btn:hover { filter: brightness(1.08); }
+
+  /* Confusion matrix visual */
+  .cm-grid { display: grid; grid-template-columns: 90px 1fr 1fr; gap: 6px; max-width: 460px; margin-top: 12px; font-size: .85rem; }
+  .cm-grid .h { font-family: var(--display); font-weight: 700; color: var(--ink-2); display: grid; place-items: center; text-align: center; }
+  .cm-grid .cell { border-radius: 10px; padding: 10px; text-align: center; }
+  .cm-grid .cell b { display: block; font-family: var(--mono); font-size: 1.2rem; }
+  .cm-grid .tp { background: var(--good-soft); color: var(--good); }
+  .cm-grid .tn { background: var(--good-soft); color: var(--good); }
+  .cm-grid .fp { background: var(--bad-soft); color: var(--bad); }
+  .cm-grid .fn { background: var(--bad-soft); color: var(--bad); }
+
+  /* Judge demo */
+  .judge-demo { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-top: 10px; }
+  .answer { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; background: var(--bg); font-size: .92rem; transition: transform .35s ease; }
+  .answer .tag { font-family: var(--display); font-weight: 800; color: var(--accent-ink); }
+  .verdict { margin-top: 12px; padding: 12px 14px; border-radius: 10px; background: var(--judge-soft); color: var(--judge); font-family: var(--display); font-weight: 700; }
+
+  /* Quiz */
+  .quiz { display: grid; gap: 14px; }
+  .q { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .q .qt { font-weight: 700; margin-bottom: 8px; }
+  .q .opts { display: grid; gap: 6px; }
+  .q .opts button { text-align: left; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; cursor: pointer; color: var(--ink); font-size: .93rem; }
+  .q .opts button:hover { border-color: var(--accent); }
+  .q .opts button.right { background: var(--good-soft); border-color: var(--good); }
+  .q .opts button.wrong { background: var(--bad-soft); border-color: var(--bad); }
+  .q .exp { font-size: .9rem; color: var(--ink-2); margin-top: 8px; }
+  .q .exp:empty { display: none; }
+
+  /* Glossary */
+  dl.gloss { display: grid; grid-template-columns: 1fr; gap: 6px 16px; max-width: 80ch; }
+  dl.gloss dt { font-family: var(--display); font-weight: 700; margin-top: 8px; }
+  dl.gloss dd { margin: 0; color: var(--ink-2); font-size: .95rem; }
+  @media (min-width: 700px) { dl.gloss { grid-template-columns: 200px 1fr; } dl.gloss dt { margin-top: 0; } }
+
+  /* Motion */
+  .pulse { animation: pulse 2.4s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { opacity: .55; } 50% { opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    .pulse { animation: none; }
+    .path a, .answer { transition: none; }
+  }
+  .footer { color: var(--ink-3); font-size: .85rem; padding-top: 24px; border-top: 1px solid var(--line); margin-top: 40px; }
+</style>
+<style>
+  /* ---------- Series navigation (shared across all guides) ---------- */
+  .series { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: .82rem; color: var(--ink-3); }
+  .series a { color: var(--accent-ink); text-decoration: none; font-family: var(--display); font-weight: 700; }
+  .series a:hover { text-decoration: underline; }
+  .series .part { font-family: var(--mono); font-size: .72rem; background: var(--accent-soft); color: var(--accent-ink); padding: 2px 8px; border-radius: 999px; }
+  .pager { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 32px; }
+  .pager a { flex: 1 1 220px; text-decoration: none; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .pager a:hover { border-color: var(--accent); }
+  .pager a .dir { font-family: var(--mono); font-size: .7rem; color: var(--ink-3); text-transform: uppercase; letter-spacing: .08em; display: block; }
+  .pager a .t { font-family: var(--display); font-weight: 700; }
+  .pager a.next { text-align: right; }
+  /* Glossary term highlight in prose */
+  .term { border-bottom: 2px dotted var(--accent); cursor: help; }
+  /* Callout list inside cards */
+  .card ul, .card ol { padding-left: 1.1rem; margin: .3rem 0; font-size: .92rem; color: var(--ink-2); }
+  /* Slider fields */
+  .field input[type="range"] { padding: 0; height: 28px; accent-color: var(--accent); }
+  .field .val { font-family: var(--mono); font-size: .85rem; color: var(--accent-ink); }
+  /* Simple flow row diagram (HTML-based, wraps on phones) */
+  .flow { display: flex; align-items: stretch; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
+  .flow .node { flex: 1 1 140px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; min-width: 0; }
+  .flow .node h4 { margin: 0 0 4px; font-size: .95rem; }
+  .flow .node p { font-size: .85rem; color: var(--ink-2); margin: 0; }
+  .flow .node.hot { border-color: var(--accent); background: var(--accent-soft); }
+  .flow .arrow { align-self: center; color: var(--ink-3); font-size: 1.2rem; }
+  /* Chat message mock */
+  .chat { display: grid; gap: 8px; margin: 14px 0; max-width: 70ch; }
+  .msg { border-radius: 12px; padding: 10px 14px; font-size: .93rem; border: 1px solid var(--line); background: var(--surface); }
+  .msg .who { font-family: var(--display); font-weight: 700; font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; display: block; margin-bottom: 2px; }
+  .msg.system { background: var(--surface-2); }
+  .msg.system .who { color: var(--ink-3); }
+  .msg.user { background: var(--accent-soft); border-color: transparent; }
+  .msg.user .who { color: var(--accent-ink); }
+  .msg.assistant { background: var(--good-soft); border-color: transparent; }
+  .msg.assistant .who { color: var(--good); }
+  .msg.tool { background: var(--judge-soft); border-color: transparent; font-family: var(--mono); font-size: .82rem; }
+  .msg.tool .who { color: var(--judge); font-family: var(--display); }
+  .msg.danger { background: var(--bad-soft); border-color: transparent; }
+  .msg.danger .who { color: var(--bad); }
+  /* Bars for probability / comparison demos */
+  .bars { display: grid; gap: 6px; margin-top: 10px; }
+  .bar-row { display: grid; grid-template-columns: 110px 1fr 56px; gap: 8px; align-items: center; font-size: .85rem; }
+  .bar-row .lbl { font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bar-row .track { height: 14px; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
+  .bar-row .fill { height: 100%; background: var(--accent); border-radius: 999px; transition: width .25s ease; }
+  .bar-row .pct { font-family: var(--mono); text-align: right; font-variant-numeric: tabular-nums; }
+  /* Comparison table highlight */
+  td.yes { color: var(--good); font-weight: 700; }
+  td.no { color: var(--bad); font-weight: 700; }
+  td.mid { color: var(--judge); font-weight: 700; }
+</style>
+</head>
+<body>
+<div class="progress" id="progress"></div>
+
+<div class="page">
+  <aside class="toc" aria-label="Chapters">
+    <nav class="toc-inner" id="toc">
+      <a href="#c0"><span class="n">0</span>The one mental model</a>
+      <a href="#c1"><span class="n">1</span>Tokens</a>
+      <a href="#c2"><span class="n">2</span>The next-token loop</a>
+      <a href="#c3"><span class="n">3</span>The context window</a>
+      <a href="#c4"><span class="n">4</span>Inside the model</a>
+      <a href="#c5"><span class="n">5</span>How models are trained</a>
+      <a href="#c6"><span class="n">6</span>Controlling randomness</a>
+      <a href="#c7"><span class="n">7</span>Hallucination</a>
+      <a href="#c8"><span class="n">8</span>What models cannot do</a>
+      <a href="#c9"><span class="n">9</span>The model landscape</a>
+      <a href="#c10"><span class="n">10</span>Quiz &amp; glossary</a>
+    </nav>
+  </aside>
+
+  <main>
+    <div class="topbar">
+      <div class="series"><a href="index.html">LLM Study Guides</a><span class="part">Part 1 of 8</span><span>How LLMs Work</span></div>
+      <button class="theme-btn" id="themeBtn" type="button" aria-label="Toggle dark mode">Toggle theme</button>
+    </div>
+
+    <header class="hero">
+      <div class="eyebrow">Part 1 · Large language models, from the inside out</div>
+      <h1>What is actually happening when an AI writes an answer?</h1>
+      <p class="lead">After this guide you will be able to explain, in your own words, how a language model turns your question into an answer, why it sometimes makes things up, and what the knobs (temperature, context window, model size) really change. Every other guide in this series builds on these ideas.</p>
+      <div class="path">
+        <a href="#c0"><span class="step">STEP 0</span><span class="name">The one mental model</span></a>
+        <a href="#c1"><span class="step">STEP 1</span><span class="name">Tokens</span></a>
+        <a href="#c2"><span class="step">STEP 2</span><span class="name">The next-token loop</span></a>
+        <a href="#c3"><span class="step">STEP 3</span><span class="name">The context window</span></a>
+        <a href="#c4"><span class="step">STEP 4</span><span class="name">Inside the model</span></a>
+        <a href="#c5"><span class="step">STEP 5</span><span class="name">How models are trained</span></a>
+        <a href="#c6"><span class="step">STEP 6</span><span class="name">Controlling randomness</span></a>
+        <a href="#c7"><span class="step">STEP 7</span><span class="name">Hallucination</span></a>
+        <a href="#c8"><span class="step">STEP 8</span><span class="name">What models cannot do</span></a>
+        <a href="#c9"><span class="step">STEP 9</span><span class="name">The model landscape</span></a>
+        <a href="#c10"><span class="step">STEP 10</span><span class="name">Quiz &amp; glossary</span></a>
+      </div>
+    </header>
+
+    <!-- ===================== CHAPTER 0 ===================== -->
+    <section class="chapter" id="c0">
+      <div class="chapter-head">
+        <div class="eyebrow">Step 0 · 3 minutes</div>
+        <h2>What you will learn, and the one idea to hold on to</h2>
+        <p class="goal">If you remember a single sentence from this guide, make it this one: a large language model is a very well-read text predictor.</p>
+      </div>
+
+      <p>A <strong>large language model</strong> (LLM) is a computer program that reads some text and guesses what text should come next. That is the whole trick. Everything you have seen an AI assistant do, from writing emails to explaining code to translating a menu, is that one trick repeated many times, one small piece of text at a time.</p>
+      <p>"Large" refers to two things: the model was built from an enormous amount of text (a large part of the public internet, books, code), and the model itself is enormous (billions of adjustable numbers inside it). "Language model" is an older term from research that simply means "a program that assigns likelihoods to sequences of words".</p>
+
+      <div class="box analogy">
+        <span class="label">Analogy</span>
+        <p>Picture a person who has spent years reading almost everything ever written, but who practised only one game: cover the next word and guess it. They became astonishingly good at the game. Today, when you ask them a question, they do not look anything up. They "guess the next word" of a helpful answer, over and over, until the answer is finished. They sound fluent and confident, because fluent, confident text is what they read the most. Whether the answer is <em>true</em> is a separate question, and it is the subject of Step 7.</p>
+      </div>
+
+      <h3>What this guide covers, in order</h3>
+      <div class="flow" aria-label="Chapter overview">
+        <div class="node"><h4>Text in</h4><p>Your words are cut into tokens (Step 1).</p></div>
+        <div class="arrow">→</div>
+        <div class="node hot"><h4>Predict</h4><p>The model guesses the next token, again and again (Steps 2, 4).</p></div>
+        <div class="arrow">→</div>
+        <div class="node"><h4>Within limits</h4><p>Only what fits the context window counts (Step 3).</p></div>
+        <div class="arrow">→</div>
+        <div class="node"><h4>Shaped by training</h4><p>Three training stages made it helpful (Step 5).</p></div>
+        <div class="arrow">→</div>
+        <div class="node"><h4>Tuned by you</h4><p>Temperature and friends (Step 6); failure modes (Steps 7, 8); the market (Step 9).</p></div>
+      </div>
+
+      <div class="box key">
+        <span class="label">Key idea</span>
+        <p>An LLM does not store facts in a database and look them up. It produces the <em>most plausible continuation</em> of the text it was given. Almost every strength (fluency, flexibility, breadth) and almost every weakness (making things up, forgetting long chats, bad arithmetic) follows from that single fact.</p>
+      </div>
+
+      <h3>How this part connects to the rest of the series</h3>
+      <p>This is Part 1 of eight. The later guides each take one consequence of "text predictor" and turn it into a practical skill: how to write the text you feed it (Prompt Engineering), how to give it your own documents (RAG), how to let it act in the world (Tools and Agents), how to measure it (Evals), how to change its behaviour (Fine-Tuning), how to keep it safe (Safety and Security) and how to run it for real users (Production). You do not need any of them to read this one.</p>
+    </section>
+
+    <!-- ===================== CHAPTER 1 ===================== -->
+    <section class="chapter" id="c1">
+      <div class="chapter-head">
+        <div class="eyebrow">Step 1 · Text becomes numbers</div>
+        <h2>Tokens: the pieces a model actually reads</h2>
+        <p class="goal">Models do not see letters or words. They see tokens. This one detail explains pricing, speed limits and some famously silly mistakes.</p>
+      </div>
+
+      <p>Computers work with numbers, not letters. So before a model can read your question, a small separate program called the <strong>tokenizer</strong> chops the text into pieces and replaces each piece with an ID number. Each piece is a <strong>token</strong>. The full list of pieces the tokenizer knows is called the <strong>vocabulary</strong>. Typical vocabularies have tens of thousands to a couple of hundred thousand entries.</p>
+      <p>A token is not quite a word. Common short words ("the", "is", "Paris") are usually one token each. Longer or rarer words are split into several: "unbelievably" might become "un", "believ", "ably". Punctuation marks are usually their own tokens, and the space before a word is normally glued to the token that follows it.</p>
+
+      <div class="diagram">
+        <svg viewBox="0 0 900 250" role="img" aria-label="A sentence split into coloured token pieces, and the word strawberry split into three tokens">
+          <text x="20" y="30" class="svg-text" font-size="14">Sentence</text>
+          <text x="110" y="30" font-family="var(--mono)" font-size="14" fill="var(--ink-2)">Unbelievably, the tokenizer split this!</text>
+          <text x="20" y="72" class="svg-text" font-size="14">Tokens</text>
+          <g font-family="var(--mono)" font-size="13">
+            <rect x="110" y="54" width="44" height="30" rx="6" fill="var(--accent-soft)"></rect><text x="132" y="74" text-anchor="middle" fill="var(--ink)">Un</text>
+            <rect x="158" y="54" width="78" height="30" rx="6" fill="var(--good-soft)"></rect><text x="197" y="74" text-anchor="middle" fill="var(--ink)">believ</text>
+            <rect x="240" y="54" width="60" height="30" rx="6" fill="var(--judge-soft)"></rect><text x="270" y="74" text-anchor="middle" fill="var(--ink)">ably</text>
+            <rect x="304" y="54" width="28" height="30" rx="6" fill="var(--human-soft)"></rect><text x="318" y="74" text-anchor="middle" fill="var(--ink)">,</text>
+            <rect x="336" y="54" width="56" height="30" rx="6" fill="var(--accent-soft)"></rect><text x="364" y="74" text-anchor="middle" fill="var(--ink)">␣the</text>
+            <rect x="396" y="54" width="82" height="30" rx="6" fill="var(--good-soft)"></rect><text x="437" y="74" text-anchor="middle" fill="var(--ink)">␣token</text>
+            <rect x="482" y="54" width="56" height="30" rx="6" fill="var(--judge-soft)"></rect><text x="510" y="74" text-anchor="middle" fill="var(--ink)">izer</text>
+            <rect x="542" y="54" width="76" height="30" rx="6" fill="var(--human-soft)"></rect><text x="580" y="74" text-anchor="middle" fill="var(--ink)">␣split</text>
+            <rect x="622" y="54" width="70" height="30" rx="6" fill="var(--accent-soft)"></rect><text x="657" y="74" text-anchor="middle" fill="var(--ink)">␣this</text>
+            <rect x="696" y="54" width="28" height="30" rx="6" fill="var(--good-soft)"></rect><text x="710" y="74" text-anchor="middle" fill="var(--ink)">!</text>
+          </g>
+          <text x="20" y="112" class="svg-text" font-size="14">IDs</text>
+          <g class="svg-sub" font-size="12">
+            <text x="132" y="112" text-anchor="middle">1412</text>
+            <text x="197" y="112" text-anchor="middle">73019</text>
+            <text x="270" y="112" text-anchor="middle">2902</text>
+            <text x="318" y="112" text-anchor="middle">11</text>
+            <text x="364" y="112" text-anchor="middle">262</text>
+            <text x="437" y="112" text-anchor="middle">11241</text>
+            <text x="510" y="112" text-anchor="middle">7509</text>
+            <text x="580" y="112" text-anchor="middle">6859</text>
+            <text x="657" y="112" text-anchor="middle">420</text>
+            <text x="710" y="112" text-anchor="middle">0</text>
+          </g>
+          <text x="740" y="74" class="svg-sub" font-size="12">6 words, 10 tokens</text>
+          <text x="740" y="112" class="svg-sub" font-size="12">(IDs are made up)</text>
+
+          <line x1="20" y1="140" x2="880" y2="140" stroke="var(--line)" stroke-width="1"></line>
+
+          <text x="20" y="176" class="svg-text" font-size="14">Why letter counting fails</text>
+          <text x="20" y="200" font-family="var(--mono)" font-size="14" fill="var(--ink-2)">strawberry</text>
+          <path d="M130 195 H180" class="svg-line" stroke-width="2" marker-end="url(#arrTok)"></path>
+          <g font-family="var(--mono)" font-size="13">
+            <rect x="190" y="180" width="48" height="30" rx="6" fill="var(--accent-soft)"></rect><text x="214" y="200" text-anchor="middle" fill="var(--ink)">str</text>
+            <rect x="242" y="180" width="40" height="30" rx="6" fill="var(--good-soft)"></rect><text x="262" y="200" text-anchor="middle" fill="var(--ink)">aw</text>
+            <rect x="286" y="180" width="68" height="30" rx="6" fill="var(--judge-soft)"></rect><text x="320" y="200" text-anchor="middle" fill="var(--ink)">berry</text>
+          </g>
+          <text x="370" y="200" class="svg-sub" font-size="12">The model sees 3 pieces, never the 10 letters. "How many r's?" is hard for it.</text>
+          <text x="20" y="236" class="svg-sub">Rule of thumb for English: 1 token is about 3/4 of a word, or about 4 characters. 100 tokens is roughly 75 words.</text>
+          <defs><marker id="arrTok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--ink-3)"></path></marker></defs>
+        </svg>
+        <p class="cap">Top: one sentence becomes ten tokens, each with an ID number. Bottom: a word the model sees as three chunks, which is why counting letters inside a word is a weak spot. The ␣ symbol marks a space glued to the token.</p>
+      </div>
+
+      <h3>Why tokens matter to you</h3>
+      <div class="cards">
+        <div class="card"><h4><span class="chip accent">1</span>Cost</h4><p>Hosted models charge per token, both for what you send and for what comes back. Shorter prompts are cheaper.</p></div>
+        <div class="card"><h4><span class="chip accent">2</span>Limits</h4><p>The context window (Step 3) is measured in tokens, not pages. A long document may not fit.</p></div>
+        <div class="card"><h4><span class="chip accent">3</span>Speed</h4><p>The model produces one token at a time. A 300-token answer takes roughly three times as long as a 100-token one.</p></div>
+        <div class="card"><h4><span class="chip accent">4</span>Odd mistakes</h4><p>Counting letters, reversing words, or rhyming can be hard because the model never sees individual letters.</p></div>
+      </div>
+
+      <p>Tokenizers are usually built from mostly English text, so English is "cheap". Other languages often need more tokens for the same meaning: a sentence in German, Hindi or Japanese may cost one and a half to three times as many tokens as its English translation. Code is also token-hungry, because indentation, brackets and unusual names each take pieces. Numbers are often split into small digit groups, which is one reason arithmetic is hard for a model (Step 8).</p>
+
+      <div class="play">
+        <span class="label">Playground 1</span>
+        <h4>Token estimator</h4>
+        <p style="font-size:.93rem;color:var(--ink-2)">Type or paste any text. This page estimates how many tokens it would cost, using a simple rule: short words are one piece, long words are split into pieces of about four letters, punctuation counts, and digits are grouped in threes. Real tokenizers differ in the details, so treat this as an approximation, not a bill.</p>
+        <div class="field"><label for="tokIn">Your text</label><textarea id="tokIn" rows="4">Unbelievably, the tokenizer split this sentence into more pieces than I expected! Try pasting a paragraph, some code, or a sentence in another language, and watch the count change.</textarea></div>
+        <div class="results" id="tokResults"></div>
+        <p style="font-size:.82rem;font-family:var(--display);font-weight:700;color:var(--ink-2);margin:14px 0 4px">Estimated pieces (colours only show the boundaries)</p>
+        <div id="tokPreview" style="font-family:var(--mono);font-size:.85rem;line-height:1.9;white-space:pre-wrap;word-break:break-word;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px"></div>
+        <p style="font-size:.85rem;color:var(--ink-3);margin-top:12px">Approximation only. A real tokenizer has a fixed vocabulary learned from data, so it splits "tokenizer" as "token" + "izer", not into equal four-letter chunks. The overall count is usually within about 20% of the real number for English prose.</p>
+      </div>
+
+      <div class="box doubt">
+        <span class="label">Common doubt</span>
+        <p><strong>"If the model sees numbers, how does it understand meaning?"</strong> The ID is only a lookup key. Inside the model each ID is swapped for a long list of numbers called an embedding (Step 4), and it is those numbers that carry meaning, learned during training. The tokenizer is just the doorman that turns text into keys.</p>
+      </div>
+
+      <div class="box key">
+        <span class="label">Key idea</span>
+        <p>Everything about a model is measured in tokens: what it can read at once, what it costs, how fast it answers. When you think "words", translate to "tokens, roughly a third more".</p>
+      </div>
+    </section>
+
+    <!-- ===================== CHAPTER 2 ===================== -->
+    <section class="chapter" id="c2">
+      <div class="chapter-head">
+        <div class="eyebrow">Step 2 · The core loop</div>
+        <h2>Predicting the next token, again and again</h2>
+        <p class="goal">A whole answer is built one token at a time. Watch the loop, then you will understand why the same question can get two different answers.</p>
+      </div>
+
+      <p>Here is the entire process of writing an answer, with nothing hidden:</p>
+      <ol>
+        <li>Take all the text so far (your question plus whatever the model has already written).</li>
+        <li>Run it through the model. The model outputs a score for <em>every</em> token in its vocabulary, saying how likely each one is to come next. Turned into percentages, these scores are a <strong>probability distribution</strong>: a list that adds up to 100%.</li>
+        <li>Pick one token from that list. Picking is called <strong>sampling</strong>. Usually the most likely token is chosen most often, but not always.</li>
+        <li>Append the chosen token to the text.</li>
+        <li>Go back to step 1, unless the chosen token was a special <strong>stop token</strong> (an invisible token that means "the answer is finished") or a length limit was hit.</li>
+      </ol>
+      <p>Running a trained model to get answers like this is called <strong>inference</strong>, as opposed to training, which is how the model was built (Step 5).</p>
+
+      <div class="diagram">
+        <svg viewBox="0 0 940 320" role="img" aria-label="The next-token loop: context goes into the model, the model outputs probabilities, one token is picked and appended, then the loop repeats until a stop token">
+          <defs>
+            <marker id="arrLoop" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--ink-3)"></path></marker>
+          </defs>
+          <!-- boxes -->
+          <g font-family="var(--display)" font-weight="700" font-size="15">
+            <rect x="30" y="60" width="200" height="70" rx="12" class="svg-box"></rect>
+            <text x="130" y="90" text-anchor="middle" fill="var(--ink)">1 Text so far</text>
+            <text x="130" y="112" text-anchor="middle" font-family="var(--mono)" font-weight="400" font-size="12" fill="var(--ink-2)">"The capital of France is"</text>
+
+            <rect x="290" y="60" width="150" height="70" rx="35" fill="var(--accent)"></rect>
+            <text x="365" y="102" text-anchor="middle" fill="#fff">2 Model</text>
+
+            <rect x="500" y="40" width="200" height="110" rx="12" class="svg-box"></rect>
+            <text x="600" y="64" text-anchor="middle" fill="var(--ink)">3 Probabilities</text>
+
+            <rect x="760" y="60" width="150" height="70" rx="12" fill="var(--good-soft)" stroke="var(--good)"></rect>
+            <text x="835" y="90" text-anchor="middle" fill="var(--good)">4 Pick one</text>
+            <text x="835" y="112" text-anchor="middle" font-family="var(--mono)" font-weight="400" font-size="12" fill="var(--good)">"Paris"</text>
+          </g>
+          <!-- probability bars -->
+          <g font-family="var(--mono)" font-size="12">
+            <rect x="512" y="74" width="120" height="14" rx="4" fill="var(--good)"></rect><text x="640" y="85" fill="var(--ink-2)">Paris 91%</text>
+            <rect x="512" y="94" width="8" height="14" rx="4" fill="var(--ink-3)"></rect><text x="640" y="105" fill="var(--ink-2)">a 4%</text>
+            <rect x="512" y="114" width="5" height="14" rx="4" fill="var(--ink-3)"></rect><text x="640" y="125" fill="var(--ink-2)">Lyon 2%</text>
+            <text x="512" y="144" fill="var(--ink-3)" font-size="11">...one score for every token in the vocabulary</text>
+          </g>
+          <!-- forward arrows -->
+          <g class="svg-line" stroke-width="2">
+            <path d="M230 95 H288" marker-end="url(#arrLoop)"></path>
+            <path d="M440 95 H498" marker-end="url(#arrLoop)"></path>
+            <path d="M700 95 H758" marker-end="url(#arrLoop)"></path>
+            <!-- loop back -->
+            <path d="M835 130 V200 H130 V132" marker-end="url(#arrLoop)"></path>
+            <!-- stop branch -->
+            <path d="M835 200 V240" marker-end="url(#arrLoop)" stroke-dasharray="4 4"></path>
+          </g>
+          <text x="480" y="192" text-anchor="middle" class="svg-text" font-size="13">5 Append it and repeat: "The capital of France is Paris"</text>
+          <rect x="745" y="244" width="180" height="40" rx="10" fill="var(--bad-soft)" stroke="var(--bad)"></rect>
+          <text x="835" y="269" text-anchor="middle" font-family="var(--display)" font-weight="700" font-size="13" fill="var(--bad)">stop token? then finish</text>
+          <text x="30" y="300" class="svg-sub">Each pass through the loop produces exactly one token. A 200-token answer means 200 trips around this loop.</text>
+          <!-- travelling token -->
+          <circle r="8" fill="var(--judge)" stroke="var(--surface)" stroke-width="3">
+            <animateMotion dur="6s" repeatCount="indefinite" path="M130 95 H365 H600 H835 V200 H130 V95" keyPoints="0;0.2;0.2;0.4;0.4;0.6;0.6;0.75;0.75;1" keyTimes="0;0.15;0.22;0.37;0.44;0.59;0.66;0.8;0.85;1" calcMode="linear"></animateMotion>
+          </circle>
+        </svg>
+        <p class="cap">The orange dot is one trip around the loop. The text so far goes in, a full list of probabilities comes out, one token is chosen and added, and the longer text goes back in. It stops when the model emits a stop token or hits a length limit.</p>
+      </div>
+
+      <div class="box analogy">
+        <span class="label">Analogy</span>
+        <p>Think of a very fast game of "one word each". You start a story with a sentence. The model adds one piece, then reads the whole story again from the top, adds one more piece, and so on. It never plans the ending in advance. Each piece is chosen only from what is already on the page. That is why the model can start a sentence confidently and paint itself into a corner by the end of it.</p>
+      </div>
+
+      <h3>Why the same question can produce different answers</h3>
+      <p>Step 3 of the loop is a dice roll weighted by the probabilities. If "Paris" has 91% and "a" has 4%, then about four times in a hundred the model will write "a" and continue with something like "a city called Paris". Both are reasonable. But every token chosen changes the text so far, which changes all the probabilities that follow. Two runs that differ at token 5 can end up very different by token 50.</p>
+      <p>Applications can turn this randomness down or off (Step 6). Even at the lowest setting, small differences in the software running the model can still cause occasional variation, so never assume perfectly identical output.</p>
+
+      <div class="box doubt">
+        <span class="label">Common doubt</span>
+        <p><strong>"Does the model think about the whole answer before it starts typing?"</strong> Not in the ordinary version of the loop. The plan, if any, exists only in the form of "which next token is most likely given a text that looks like it is heading somewhere sensible". So-called reasoning models (Step 9) change this a little: they are trained to write out a draft of their thinking as ordinary tokens before the final answer, which gives them somewhere to plan.</p>
+      </div>
+
+      <div class="box key">
+        <span class="label">Key idea</span>
+        <p>One token per loop, picked from a probability list, appended, repeat. Everything else in this guide is either a detail of one step in this loop or a consequence of it.</p>
+      </div>
+    </section>
+
+    <!-- ===================== CHAPTER 3 ===================== -->
+    <section class="chapter" id="c3">
+      <div class="chapter-head">
+        <div class="eyebrow">Step 3 · Working memory</div>
+        <h2>The context window: everything the model can see right now</h2>
+        <p class="goal">A model has no memory except the text in front of it, and that text has a hard size limit. This explains why long chats "forget" and why big documents cost more.</p>
+      </div>
+
+      <p>The <strong>context window</strong> (or just "context") is the maximum number of tokens the model can take in at once. Everything the model can use to write its next token must fit inside it:</p>
+      <ul>
+        <li>The <strong>system prompt</strong>: hidden instructions the application writes, such as "You are a support assistant for a cooking app. Be brief."</li>
+        <li>The conversation so far: every message from the user and every earlier answer from the model.</li>
+        <li>Any documents, search results or tool outputs the application pasted in.</li>
+        <li>The answer the model is currently writing, token by token.</li>
+      </ul>
+      <p>Everything else, including your chat from last week, the file you did not paste, and the whole internet, is invisible to it. A chat app that seems to "remember" you is quietly re-sending the earlier messages inside the window every time, or storing notes about you and pasting them in.</p>
+
+      <div class="chat" aria-label="What goes into one request">
+        <div class="msg system"><span class="who">System prompt (from the app)</span>You are a helpful assistant for a recipe app. Answer in under 80 words.</div>
+        <div class="msg user"><span class="who">User</span>I have eggs, spinach and feta. Dinner ideas?</div>
+        <div class="msg assistant"><span class="who">Assistant (earlier turn)</span>A spinach and feta omelette takes ten minutes...</div>
+        <div class="msg user"><span class="who">User</span>Can I make that without dairy?</div>
+        <div class="msg assistant"><span class="who">Assistant (being written now)</span>Yes. Swap the feta for...</div>
+      </div>
+      <p>All five blocks above are sent together as one long text on every turn. The model reads the whole thing from the top and predicts the next token of the last block.</p>
+
+      <div class="diagram">
+        <svg viewBox="0 0 940 330" role="img" aria-label="Three snapshots of a growing conversation with a fixed-size context window; older messages fall outside the window">
+          <defs>
+            <marker id="arrCtx" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--ink-3)"></path></marker>
+          </defs>
+          <!-- Row 1: early -->
+          <text x="20" y="34" class="svg-text" font-size="13">Turn 3: all fits</text>
+          <g font-family="var(--mono)" font-size="11">
+            <rect x="200" y="20" width="70" height="26" rx="6" fill="var(--surface-2)" stroke="var(--line)"></rect><text x="235" y="38" text-anchor="middle" fill="var(--ink-2)">system</text>
+            <rect x="274" y="20" width="60" height="26" rx="6" fill="var(--accent-soft)"></rect><text x="304" y="38" text-anchor="middle" fill="var(--ink)">user 1</text>
+            <rect x="338" y="20" width="90" height="26" rx="6" fill="var(--good-soft)"></rect><text x="383" y="38" text-anchor="middle" fill="var(--ink)">answer 1</text>
+            <rect x="432" y="20" width="60" height="26" rx="6" fill="var(--accent-soft)"></rect><text x="462" y="38" text-anchor="middle" fill="var(--ink)">user 2</text>
+            <rect x="496" y="20" width="90" height="26" rx="6" fill="var(--good-soft)"></rect><text x="541" y="38" text-anchor="middle" fill="var(--ink)">answer 2</text>
+            <rect x="590" y="20" width="60" height="26" rx="6" fill="var(--accent-soft)"></rect><text x="620" y="38" text-anchor="middle" fill="var(--ink)">user 3</text>
+          </g>
+          <rect x="194" y="12" width="466" height="42" rx="10" fill="none" stroke="var(--accent)" stroke-width="2" stroke-dasharray="6 4"></rect>
+          <text x="670" y="38" class="svg-sub" font-size="11" fill="var(--accent-ink)">window (fixed size)</text>
+
+          <!-- Row 2: full -->
+          <text x="20" y="124" class="svg-text" font-size="13">Turn 6: full</text>
+          <g font-family="var(--mono)" font-size="11">
+            <rect x="200" y="110" width="70" height="26" rx="6" fill="var(--surface-2)" stroke="var(--line)"></rect><text x="235" y="128" text-anchor="middle" fill="var(--ink-2)">system</text>
+            <rect x="274" y="110" width="60" height="26" rx="6" fill="var(--accent-soft)"></rect><text x="304" y="128" text-anchor="middle" fill="var(--ink)">user 1</text>
+            <rect x="338" y="110" width="90" height="26" rx="6" fill="var(--good-soft)"></rect><text x="383" y="128" text-anchor="middle" fill="var(--ink)">answer 1</text>
+            <rect x="432" y="110" width="60" height="26" rx="6" fill="var(--accent-soft)"></rect><text x="462" y="128" text-anchor="middle" fill="var(--ink)">user 2</text>
+            <rect x="496" y="110" width="90" height="26" rx="6" fill="var(--good-soft)"></rect><text x="541" y="128" text-anchor="middle" fill="var(--ink)">answer 2</text>
+            <rect x="590" y="110" width="60" height="26" rx="6" fill="var(--accent-soft)"></rect><text x="620" y="128" text-anchor="middle" fill="var(--ink)">user 3</text>
+            <rect x="654" y="110" width="90" height="26" rx="6" fill="var(--good-soft)"></rect><text x="699" y="128" text-anchor="middle" fill="var(--ink)">answer 3</text>
+            <rect x="748" y="110" width="60" height="26" rx="6" fill="var(--accent-soft)"></rect><text x="778" y="128" text-anchor="middle" fill="var(--ink)">user 4</text>
+            <rect x="812" y="110" width="90" height="26" rx="6" fill="var(--good-soft)"></rect><text x="857" y="128" text-anchor="middle" fill="var(--ink)">answer 4</text>
+          </g>
+          <rect x="194" y="102" width="712" height="42" rx="10" fill="none" stroke="var(--accent)" stroke-width="2" stroke-dasharray="6 4"></rect>
+          <text x="200" y="164" class="svg-sub" font-size="11">Every token in the window is re-read on every turn, so this turn costs more and is slower than turn 3.</text>
+
+          <!-- Row 3: overflow -->
+          <text x="20" y="224" class="svg-text" font-size="13">Turn 9: overflow</text>
+          <g font-family="var(--mono)" font-size="11">
+            <rect x="200" y="210" width="70" height="26" rx="6" fill="var(--surface-2)" stroke="var(--line)"></rect><text x="235" y="228" text-anchor="middle" fill="var(--ink-2)">system</text>
+            <rect x="274" y="210" width="60" height="26" rx="6" fill="var(--bad-soft)" stroke="var(--bad)" stroke-dasharray="3 3"></rect><text x="304" y="228" text-anchor="middle" fill="var(--bad)">user 1</text>
+            <rect x="338" y="210" width="90" height="26" rx="6" fill="var(--bad-soft)" stroke="var(--bad)" stroke-dasharray="3 3"></rect><text x="383" y="228" text-anchor="middle" fill="var(--bad)">answer 1</text>
+            <rect x="432" y="210" width="60" height="26" rx="6" fill="var(--bad-soft)" stroke="var(--bad)" stroke-dasharray="3 3"></rect><text x="462" y="228" text-anchor="middle" fill="var(--bad)">user 2</text>
+            <rect x="496" y="210" width="90" height="26" rx="6" fill="var(--good-soft)"></rect><text x="541" y="228" text-anchor="middle" fill="var(--ink)">answer 2</text>
+            <rect x="590" y="210" width="60" height="26" rx="6" fill="var(--accent-soft)"></rect><text x="620" y="228" text-anchor="middle" fill="var(--ink)">user 3</text>
+            <rect x="654" y="210" width="90" height="26" rx="6" fill="var(--good-soft)"></rect><text x="699" y="228" text-anchor="middle" fill="var(--ink)">answer 3</text>
+            <rect x="748" y="210" width="60" height="26" rx="6" fill="var(--accent-soft)"></rect><text x="778" y="228" text-anchor="middle" fill="var(--ink)">user 4</text>
+            <rect x="812" y="210" width="90" height="26" rx="6" fill="var(--good-soft)"></rect><text x="857" y="228" text-anchor="middle" fill="var(--ink)">... user 6</text>
+          </g>
+          <rect x="194" y="202" width="712" height="42" rx="10" fill="none" stroke="var(--accent)" stroke-width="2" stroke-dasharray="6 4"></rect>
+          <text x="200" y="266" class="svg-sub" font-size="11" fill="var(--bad)">Dropped or summarised by the app: the model can no longer see what you said in turn 1.</text>
+          <text x="20" y="306" class="svg-sub">The system prompt is usually kept no matter what, because the app re-inserts it at the top of every request.</text>
+        </svg>
+        <p class="cap">The dashed blue box is the context window; its size never changes. As the conversation grows it fills up, and eventually the oldest messages are pushed out (red). The model is not "forgetting" in a human sense: those tokens were simply not sent to it.</p>
+      </div>
+
+      <h3>What happens when it is full</h3>
+      <p>Two things can happen, and the application decides which. Either the request is rejected with an error ("too many tokens"), or the app trims the oldest messages, or replaces them with a short summary, before sending. Neither option is free: the first breaks the conversation, the second loses detail. Good products do the trimming carefully and keep the system prompt and the most recent turns.</p>
+
+      <div class="box analogy">
+        <span class="label">Analogy</span>
+        <p>Imagine a brilliant colleague who has a whiteboard of fixed size and no other memory. Whatever is on the whiteboard, they can reason about superbly. Whatever you wiped off to make room is gone, even if you wrote it yourself an hour ago. Every time you ask something, they re-read the entire board before answering, so a full board also means a slower answer.</p>
+      </div>
+
+      <div class="box warn">
+        <span class="label">Watch out</span>
+        <p>A bigger window is not a magic fix. Models tend to pay less reliable attention to material buried in the middle of a very long context, and every extra token you send costs money and time on every single turn. Sending only what is relevant is a core skill, and it is what the RAG guide (Part 3) is about.</p>
+      </div>
+
+      <div class="box key">
+        <span class="label">Key idea</span>
+        <p>The context window is the model's entire working memory. Cost and latency scale with how much you put in it. If a fact is not in the window, the model cannot use it, no matter how many times you told it before.</p>
+      </div>
+    </section>
+
+    <!-- ===================== CHAPTER 4 ===================== -->
+    <section class="chapter" id="c4">
+      <div class="chapter-head">
+        <div class="eyebrow">Step 4 · Under the hood, gently</div>
+        <h2>Inside the model: dials, layers and attention</h2>
+        <p class="goal">You do not need maths to understand what the "model" box in Step 2 contains. Four ideas are enough: parameters, layers, attention and embeddings.</p>
+      </div>
+
+      <h3>A neural network is a pile of tunable dials</h3>
+      <p>The model is a <strong>neural network</strong>: a very large arithmetic formula that takes numbers in (the token IDs, converted to numbers) and produces numbers out (a score for each possible next token). The formula contains an enormous number of adjustable values called <strong>parameters</strong>, also called <strong>weights</strong>. Think of them as dials. "A 7-billion-parameter model" means a formula with seven billion dials. Nobody sets the dials by hand; training (Step 5) nudges them millions of times until the formula predicts text well.</p>
+      <p>The formula is organised in <strong>layers</strong>. Each layer takes the output of the previous layer and transforms it a little. Early layers tend to capture simple things (spelling, word parts); later layers capture more abstract things (grammar, topic, tone, what the question is really asking). A large model may have dozens of layers.</p>
+
+      <div class="box analogy">
+        <span class="label">Analogy</span>
+        <p>A mixing desk in a recording studio has hundreds of sliders. Nobody understands what each slider does on its own, but a skilled engineer can adjust them all together until the sound is right. A language model is a mixing desk with billions of sliders, and "the sound being right" means "predicting the next token well". Training is the slow process of nudging every slider a tiny bit, over and over.</p>
+      </div>
+
+      <h3>The transformer and attention</h3>
+      <p>Almost all modern LLMs use a network design called the <strong>transformer</strong>. Its signature ingredient is <strong>attention</strong>. Older designs read text strictly left to right and tended to lose track of earlier words. Attention lets every token in the context look at every other token and decide which ones matter for understanding it. When processing the word "it", attention can look back and give most of its weight to "the cat", a little to "the mat", and almost none to "on".</p>
+
+      <div class="diagram">
+        <svg viewBox="0 0 900 250" role="img" aria-label="Attention: the word it looks back at earlier words; thick lines to cat, thin lines to mat and other words">
+          <g font-family="var(--mono)" font-size="15">
+            <rect x="30" y="140" width="60" height="36" rx="8" fill="var(--surface-2)" stroke="var(--line)"></rect><text x="60" y="164" text-anchor="middle" fill="var(--ink)">The</text>
+            <rect x="110" y="140" width="60" height="36" rx="8" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"></rect><text x="140" y="164" text-anchor="middle" fill="var(--ink)">cat</text>
+            <rect x="190" y="140" width="60" height="36" rx="8" fill="var(--surface-2)" stroke="var(--line)"></rect><text x="220" y="164" text-anchor="middle" fill="var(--ink)">sat</text>
+            <rect x="270" y="140" width="50" height="36" rx="8" fill="var(--surface-2)" stroke="var(--line)"></rect><text x="295" y="164" text-anchor="middle" fill="var(--ink)">on</text>
+            <rect x="340" y="140" width="60" height="36" rx="8" fill="var(--surface-2)" stroke="var(--line)"></rect><text x="370" y="164" text-anchor="middle" fill="var(--ink)">the</text>
+            <rect x="420" y="140" width="64" height="36" rx="8" fill="var(--surface-2)" stroke="var(--line)"></rect><text x="452" y="164" text-anchor="middle" fill="var(--ink)">mat</text>
+            <rect x="504" y="140" width="110" height="36" rx="8" fill="var(--surface-2)" stroke="var(--line)"></rect><text x="559" y="164" text-anchor="middle" fill="var(--ink)">because</text>
+            <rect x="634" y="140" width="50" height="36" rx="8" fill="var(--judge-soft)" stroke="var(--judge)" stroke-width="2"></rect><text x="659" y="164" text-anchor="middle" fill="var(--ink)">it</text>
+            <rect x="704" y="140" width="60" height="36" rx="8" fill="var(--surface-2)" stroke="var(--line)"></rect><text x="734" y="164" text-anchor="middle" fill="var(--ink)">was</text>
+            <rect x="784" y="140" width="90" height="36" rx="8" fill="var(--surface-2)" stroke="var(--line)"></rect><text x="829" y="164" text-anchor="middle" fill="var(--ink)">tired</text>
+          </g>
+          <!-- attention arcs from "it" -->
+          <g fill="none" stroke-linecap="round">
+            <path d="M650 140 C 560 40, 230 40, 140 140" stroke="var(--accent)" stroke-width="6" opacity=".9"></path>
+            <path d="M655 140 C 600 80, 500 80, 452 140" stroke="var(--accent)" stroke-width="2.5" opacity=".7"></path>
+            <path d="M652 140 C 560 60, 300 60, 220 140" stroke="var(--ink-3)" stroke-width="1.2" opacity=".6" stroke-dasharray="3 3"></path>
+            <path d="M658 140 C 640 100, 590 100, 559 140" stroke="var(--ink-3)" stroke-width="1.2" opacity=".6" stroke-dasharray="3 3"></path>
+          </g>
+          <g font-family="var(--mono)" font-size="12">
+            <rect x="330" y="20" width="150" height="24" rx="6" fill="var(--accent-soft)"></rect><text x="405" y="37" text-anchor="middle" fill="var(--accent-ink)">cat: high weight</text>
+            <rect x="700" y="96" width="140" height="22" rx="6" fill="var(--surface)" stroke="var(--line)"></rect><text x="770" y="112" text-anchor="middle" fill="var(--ink-2)">mat: some weight</text>
+          </g>
+          <text x="30" y="212" class="svg-sub">Working on "it", the model asks every earlier token "how relevant are you?" and mixes their meanings in proportion. "cat" wins.</text>
+          <text x="30" y="232" class="svg-sub">So "it" comes to mean the cat. This happens for every token, in every layer, with several "heads" at once.</text>
+        </svg>
+        <p class="cap">Attention drawn as lines from "it" back to the words it is looking at. Line thickness stands for weight. Nothing here is a fixed rule; the weights are computed fresh for every sentence from the trained parameters.</p>
+      </div>
+
+      <p>Because attention connects everything to everything, its cost grows quickly with the length of the context: doubling the number of tokens roughly quadruples the attention work in the simplest version. That is one reason very long contexts are slow and expensive, and why researchers spend so much effort on cheaper variants.</p>
+
+      <h3>Embeddings: a point in meaning-space</h3>
+      <p>The first thing a model does with a token ID is swap it for an <strong>embedding</strong>: a list of a few hundred to a few thousand numbers that you can picture as coordinates of a point in a huge space. Tokens with similar meanings end up near each other. "Kitten" is near "cat", "Paris" is near "Lyon", and the direction from "king" to "queen" is similar to the direction from "man" to "woman". The layers above then push these points around until the final position encodes "what token should come next". Embeddings are also useful on their own, for search: that is the heart of the RAG guide (Part 3), which goes much deeper.</p>
+
+      <div class="box doubt">
+        <span class="label">Common doubt</span>
+        <p><strong>"So does anyone know what each parameter does?"</strong> Mostly no. The parameters were set by an automatic process, and their meaning is spread across millions of them at once. A research field called interpretability is slowly finding recognisable patterns inside models, but for everyday work you should treat the model as a black box that you test from the outside. That is why evals (Part 5) matter so much.</p>
+      </div>
+
+      <div class="box key">
+        <span class="label">Key idea</span>
+        <p>Inside the box: token IDs become embeddings, dozens of layers transform them, attention lets every token consult every other token, and billions of trained parameters decide how. The output is one score per vocabulary entry. No maths is needed to use this picture, only to build it.</p>
+      </div>
+
+      <details class="deeper">
+        <summary>Go deeper: a few honest hardware facts</summary>
+        <p>Running billions of multiplications per token is heavy work, so models run on <strong>GPUs</strong> (graphics processing units), chips originally built for video games that are very good at doing many multiplications in parallel. A model's parameters must sit in the GPU's memory while it runs; a model with tens of billions of parameters needs tens of gigabytes of memory, which is why the largest models are served from data centres rather than laptops. Two speed words you will hear: <strong>latency</strong> is how long you wait for a response (or for the first token), and <strong>throughput</strong> is how many tokens per second a system produces across all users. Small models win on both; large models win on quality.</p>
+      </details>
+    </section>
+
+    <!-- ===================== CHAPTER 5 ===================== -->
+    <section class="chapter" id="c5">
+      <div class="chapter-head">
+        <div class="eyebrow">Step 5 · Where the behaviour comes from</div>
+        <h2>How a model is trained: three stages</h2>
+        <p class="goal">A raw text predictor is not an assistant. Three training stages turn one into the other. Knowing them explains why models behave the way they do.</p>
+      </div>
+
+      <div class="diagram">
+        <svg viewBox="0 0 980 330" role="img" aria-label="Training pipeline: pre-training on a huge pile of text produces a base model; supervised fine-tuning on question-answer examples produces an instruction model; preference tuning from human comparisons produces a chat assistant">
+          <defs>
+            <marker id="arrTrain" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--ink-3)"></path></marker>
+          </defs>
+          <!-- inputs row -->
+          <g font-family="var(--mono)" font-size="12">
+            <rect x="60" y="30" width="220" height="44" rx="10" fill="var(--surface-2)" stroke="var(--line)"></rect>
+            <text x="170" y="49" text-anchor="middle" fill="var(--ink-2)">trillions of tokens of text</text>
+            <text x="170" y="65" text-anchor="middle" fill="var(--ink-3)">web, books, code</text>
+            <rect x="380" y="30" width="220" height="44" rx="10" fill="var(--surface-2)" stroke="var(--line)"></rect>
+            <text x="490" y="49" text-anchor="middle" fill="var(--ink-2)">thousands of good examples</text>
+            <text x="490" y="65" text-anchor="middle" fill="var(--ink-3)">question + ideal answer</text>
+            <rect x="700" y="30" width="220" height="44" rx="10" fill="var(--surface-2)" stroke="var(--line)"></rect>
+            <text x="810" y="49" text-anchor="middle" fill="var(--ink-2)">human comparisons</text>
+            <text x="810" y="65" text-anchor="middle" fill="var(--ink-3)">"answer A is better than B"</text>
+          </g>
+          <g class="svg-line" stroke-width="2">
+            <path d="M170 74 V98" marker-end="url(#arrTrain)"></path>
+            <path d="M490 74 V98" marker-end="url(#arrTrain)"></path>
+            <path d="M810 74 V98" marker-end="url(#arrTrain)"></path>
+          </g>
+          <!-- stages -->
+          <g font-family="var(--display)" font-weight="700" font-size="15">
+            <rect x="60" y="100" width="220" height="84" rx="12" fill="var(--accent)"></rect>
+            <text x="170" y="127" text-anchor="middle" fill="#fff">1 Pre-training</text>
+            <text x="170" y="148" text-anchor="middle" font-size="12" font-weight="400" fill="#fff">predict the next token</text>
+            <rect x="380" y="100" width="220" height="84" rx="12" fill="var(--judge-soft)" stroke="var(--judge)"></rect>
+            <text x="490" y="127" text-anchor="middle" fill="var(--judge)">2 Instruction tuning</text>
+            <text x="490" y="148" text-anchor="middle" font-size="12" font-weight="400" fill="var(--judge)">imitate good answers</text>
+            <rect x="700" y="100" width="220" height="84" rx="12" fill="var(--human-soft)" stroke="var(--human)"></rect>
+            <text x="810" y="127" text-anchor="middle" fill="var(--human)">3 Preference tuning</text>
+            <text x="810" y="148" text-anchor="middle" font-size="12" font-weight="400" fill="var(--human)">learn what people prefer</text>
+          </g>
+          <g class="svg-line" stroke-width="2">
+            <path d="M280 128 H378" marker-end="url(#arrTrain)"></path>
+            <path d="M600 128 H698" marker-end="url(#arrTrain)"></path>
+          </g>
+          <!-- outputs row -->
+          <g class="svg-line" stroke-width="2">
+            <path d="M170 184 V208" marker-end="url(#arrTrain)"></path>
+            <path d="M490 184 V208" marker-end="url(#arrTrain)"></path>
+            <path d="M810 184 V208" marker-end="url(#arrTrain)"></path>
+          </g>
+          <g font-family="var(--display)" font-weight="700" font-size="13">
+            <rect x="60" y="210" width="220" height="40" rx="10" fill="var(--surface)" stroke="var(--accent)"></rect>
+            <text x="170" y="235" text-anchor="middle" fill="var(--accent-ink)">Base model: continues text</text>
+            <rect x="380" y="210" width="220" height="40" rx="10" fill="var(--surface)" stroke="var(--judge)"></rect>
+            <text x="490" y="235" text-anchor="middle" fill="var(--judge)">Follows instructions</text>
+            <rect x="700" y="210" width="220" height="40" rx="10" fill="var(--surface)" stroke="var(--human)"></rect>
+            <text x="810" y="235" text-anchor="middle" fill="var(--human)">Chat assistant: helpful, polite</text>
+          </g>
+          <g class="svg-sub" font-size="11">
+            <text x="170" y="276" text-anchor="middle">months, thousands of GPUs</text>
+            <text x="490" y="276" text-anchor="middle">days, a few GPUs</text>
+            <text x="810" y="276" text-anchor="middle">days, a few GPUs, many raters</text>
+            <text x="170" y="296" text-anchor="middle">"read the whole library"</text>
+            <text x="490" y="296" text-anchor="middle">"apprenticeship"</text>
+            <text x="810" y="296" text-anchor="middle">"customer feedback"</text>
+          </g>
+          <!-- travelling model -->
+          <circle r="9" fill="var(--good)" stroke="var(--surface)" stroke-width="3">
+            <animateMotion dur="8s" repeatCount="indefinite" path="M170 168 H490 H810" keyPoints="0;0;0.5;0.5;1;1" keyTimes="0;0.2;0.4;0.6;0.8;1" calcMode="linear"></animateMotion>
+          </circle>
+        </svg>
+        <p class="cap">The green dot is the model itself moving through the three stages. Each stage starts from the parameters the previous stage produced and adjusts them further. Time and hardware figures are rough orders of magnitude, not measurements.</p>
+      </div>
+
+      <h3>Stage 1: pre-training</h3>
+      <p><strong>Pre-training</strong> is the expensive part. The model starts with random parameters and is shown an enormous quantity of text, a few thousand tokens at a time. For every position it guesses the next token, is told the real one, and its parameters are nudged a tiny amount toward guessing better. Repeat this trillions of times and the model has absorbed spelling, grammar, facts, styles, code, and a great deal of the structure of human knowledge, purely as a by-product of getting good at guessing. Everything it will ever "know" about the world, it learns here. The text it saw is called its <strong>training data</strong>, and the point in time where that text ends is its <strong>knowledge cutoff</strong> (Step 8).</p>
+      <p>The result is a <strong>base model</strong>. A base model is a pure continuer. Ask it "What is the capital of France?" and it may well answer "What is the capital of Germany? What is the capital of Spain?" because a list of quiz questions is a very plausible continuation of one quiz question. It is powerful but hard to use.</p>
+
+      <h3>Stage 2: supervised fine-tuning (instruction tuning)</h3>
+      <p><strong>Fine-tuning</strong> means continuing to train an existing model on a smaller, chosen dataset. In this stage the dataset is thousands of example conversations written or approved by people: a question, then an ideal answer. This is <strong>instruction tuning</strong> (also called supervised fine-tuning, because humans supervised the examples). The model learns the <em>format</em> of being an assistant: when it sees a question, it should answer it, not continue the quiz. It also learns to stop when the answer is finished, by emitting the stop token that the examples end with.</p>
+
+      <h3>Stage 3: preference tuning (RLHF and relatives)</h3>
+      <p>Writing perfect example answers is slow. Comparing two answers is fast. In <strong>preference tuning</strong>, the model writes several answers to the same question, humans (or, increasingly, another model following written rules) mark which one is better, and the model's parameters are nudged toward the preferred style: more helpful, more honest about uncertainty, less harmful, better formatted. The best-known method is <strong>RLHF</strong>, reinforcement learning from human feedback, where "reinforcement learning" simply means learning from a reward signal rather than from copied examples. Newer methods do the same job with simpler maths. The output is the polished chat model you actually talk to.</p>
+
+      <div class="box analogy">
+        <span class="label">Analogy</span>
+        <p>Stage 1 is a student who reads every book in an enormous library with no teacher, and comes out knowing a huge amount but with no idea how to hold a conversation. Stage 2 is an apprenticeship: they sit beside an expert and copy how the expert answers customers. Stage 3 is customer feedback: they answer real questions, customers rate them, and they gradually adjust their manner to what people actually like.</p>
+      </div>
+
+      <div class="tbl"><table aria-label="Base model versus chat model">
+        <thead><tr><th>Ask it</th><th>Base model (after stage 1)</th><th>Chat model (after stage 3)</th></tr></thead>
+        <tbody>
+          <tr><td>"Translate to French: good morning"</td><td>Might continue: "Translate to French: good night..."</td><td>"Bonjour."</td></tr>
+          <tr><td>"Write a polite refusal email"</td><td>Might produce a blog post about email etiquette</td><td>Writes the email, then stops</td></tr>
+          <tr><td>Something it does not know</td><td>Confidently continues in any direction</td><td>More likely to say it is unsure (but still not reliably)</td></tr>
+          <tr><td>Something harmful</td><td>Completes it like any other text</td><td>Usually declines</td></tr>
+        </tbody>
+      </table></div>
+
+      <div class="box doubt">
+        <span class="label">Common doubt</span>
+        <p><strong>"Does the model keep learning from my conversations?"</strong> Not while you chat. Inference does not change the parameters. Everything the model learned happened in training, which finished before you arrived. Providers may later use conversation data to train the <em>next</em> version, subject to their policies, but the model you are talking to right now is frozen.</p>
+      </div>
+
+      <div class="box key">
+        <span class="label">Key idea</span>
+        <p>Knowledge comes from pre-training. Manners come from fine-tuning and preference tuning. When a model knows a fact but presents it badly, or presents a wrong fact beautifully, you are seeing those two layers separately. Fine-tuning your own model (Part 6) works on the second layer far more easily than the first.</p>
+      </div>
+    </section>
+
+    <!-- ===================== CHAPTER 6 ===================== -->
+    <section class="chapter" id="c6">
+      <div class="chapter-head">
+        <div class="eyebrow">Step 6 · The knobs</div>
+        <h2>Controlling randomness: temperature, top-p, max tokens, stop sequences</h2>
+        <p class="goal">Step 2 said the model rolls weighted dice. Here are the four settings that shape the dice, with a playground so you can feel what each one does.</p>
+      </div>
+
+      <p>When an application calls a model it can pass a handful of <strong>sampling</strong> settings alongside the prompt. They do not change the model's knowledge. They change how the probability list from Step 2 is turned into a single chosen token.</p>
+
+      <div class="cards">
+        <div class="card"><h4><span class="chip accent">1</span>Temperature</h4><p>A number, usually between 0 and 2, that reshapes the probabilities. Low temperature sharpens them (the favourite token wins almost every time). High temperature flattens them (unlikely tokens get a real chance). At 0 the model always takes the single most likely token, which is called greedy decoding.</p></div>
+        <div class="card"><h4><span class="chip accent">2</span>Top-p</h4><p>Also called nucleus sampling. Keep only the most likely tokens whose probabilities add up to p (say 0.9), throw away the long tail, then sample from what is left. It stops rare nonsense tokens from ever being picked, even at high temperature.</p></div>
+        <div class="card"><h4><span class="chip accent">3</span>Max tokens</h4><p>A hard ceiling on how many tokens the answer may contain. When it is hit the answer is cut off mid-sentence. It protects your budget; it does not make the model write concisely.</p></div>
+        <div class="card"><h4><span class="chip accent">4</span>Stop sequences</h4><p>Strings that end the answer the moment they appear, such as a newline or the word "User:". Useful when you want exactly one line, or one item from a list.</p></div>
+      </div>
+
+      <div class="play">
+        <span class="label">Playground 2</span>
+        <h4>Temperature slider</h4>
+        <p style="font-size:.93rem;color:var(--ink-2)">The text so far is <code>The capital of France is</code>. Below are six candidate next tokens with fixed raw scores from an imaginary model. Move the temperature slider and watch the probabilities reshape. Then use top-p to cut off the tail, and press the button to roll the dice.</p>
+        <div class="field">
+          <label for="tempIn">Temperature: <span class="val" id="tempVal">1.0</span></label>
+          <input type="range" id="tempIn" min="0.1" max="2" step="0.1" value="1">
+        </div>
+        <div class="field">
+          <label for="topPIn">Top-p: <span class="val" id="topPVal">0.90</span></label>
+          <input type="range" id="topPIn" min="0.1" max="1" step="0.05" value="0.9">
+        </div>
+        <div class="bars" id="tempBars" aria-live="polite"></div>
+        <p style="font-size:.85rem;color:var(--ink-2);margin-top:12px" id="tempExplain"></p>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px">
+          <button type="button" class="btn" id="sampleBtn">Sample one token</button>
+          <button type="button" class="btn ghost" id="sampleReset">Clear</button>
+          <span style="font-family:var(--mono);font-size:.85rem;color:var(--ink-2)" id="sampleOut"></span>
+        </div>
+        <p style="font-size:.85rem;color:var(--ink-3);margin-top:12px">The raw scores are divided by the temperature and then turned into percentages (the formula is called softmax). Grey bars are candidates that top-p has removed: they can never be sampled, whatever their probability was.</p>
+      </div>
+
+      <h3>What you should have seen</h3>
+      <ul>
+        <li><strong>Low temperature (0.1 to 0.3):</strong> one bar dominates. The output is predictable and repetitive. Good for extraction, classification, code, anything with one right answer.</li>
+        <li><strong>Temperature around 1:</strong> the raw scores are used as they are. This is the natural setting the model was trained toward, and a common default for chat.</li>
+        <li><strong>High temperature (1.5 to 2):</strong> bars flatten and "Lyon" or "lovely" get picked regularly. Creative, surprising, and increasingly incoherent.</li>
+        <li><strong>Top-p:</strong> at 0.9 the rarest candidates are cut. At 1.0 nothing is cut. Lowering it is a safety net against nonsense without making the output as rigid as low temperature does.</li>
+      </ul>
+
+      <div class="box analogy">
+        <span class="label">Analogy</span>
+        <p>Temperature is the mood of a chef choosing tonight's special. At low temperature they cook the dish they know sells best, every night. At high temperature they are willing to try the odd combinations at the back of the recipe book. Top-p is the manager removing the truly bizarre recipes from the book before the chef even starts, so that however adventurous the chef feels, nobody gets served ice cream soup.</p>
+      </div>
+
+      <h3>The same settings in code</h3>
+      <p>Every provider's library exposes these settings under similar names. The function <code>call_model</code> below stands in for whichever one you use.</p>
+      <pre><code><span class="cm"># One call to a language model, with the four sampling controls from this chapter.</span>
+<span class="cm"># call_model() stands for whatever provider library you use; the ideas are the same everywhere.</span>
+
+<span class="kw">def</span> <span class="fn">answer</span>(question):
+    prompt = <span class="st">"Answer in one short paragraph.\n\nQuestion: "</span> + question + <span class="st">"\nAnswer:"</span>
+    reply = <span class="fn">call_model</span>(
+        prompt,
+        temperature=<span class="st">0.2</span>,            <span class="cm"># low: mostly the most likely tokens, few surprises</span>
+        top_p=<span class="st">0.9</span>,                  <span class="cm"># drop the rare tail before sampling</span>
+        max_tokens=<span class="st">200</span>,             <span class="cm"># hard cap on answer length (protects the budget)</span>
+        stop=[<span class="st">"\nQuestion:"</span>],       <span class="cm"># stop if the model starts inventing a new question</span>
+    )
+    <span class="kw">return</span> reply.strip()
+
+<span class="fn">print</span>(<span class="fn">answer</span>(<span class="st">"Why does bread rise?"</span>))</code></pre>
+
+      <div class="box doubt">
+        <span class="label">Common doubt</span>
+        <p><strong>"Should I just always use temperature 0 to get the right answer?"</strong> Temperature 0 gives the most <em>likely</em> answer, not the most correct one. If the model's best guess is wrong, it will be wrong every time, just consistently. Low temperature is about repeatability, which is valuable for testing and for structured output. It is not a truth setting.</p>
+      </div>
+
+      <div class="box tip">
+        <span class="label">Practical tip</span>
+        <p>Change one knob at a time and start from the defaults. For anything you will evaluate automatically (Part 5), fix the temperature low so that runs are comparable. For brainstorming, raise it. Set max tokens generously and control length with instructions in the prompt instead, so that answers are not chopped mid-sentence.</p>
+      </div>
+
+      <div class="box key">
+        <span class="label">Key idea</span>
+        <p>Sampling settings shape how the dice are rolled, nothing more. Temperature sharpens or flattens the odds, top-p removes the long tail, max tokens and stop sequences decide when to stop rolling.</p>
+      </div>
+    </section>
+
+    <!-- ===================== CHAPTER 7 ===================== -->
+    <section class="chapter" id="c7">
+      <div class="chapter-head">
+        <div class="eyebrow">Step 7 · The famous failure</div>
+        <h2>Hallucination: confidently wrong</h2>
+        <p class="goal">Why a fluent predictor sometimes states false things with total confidence, when it gets worse, and the defences that actually work.</p>
+      </div>
+
+      <p>A <strong>hallucination</strong> is a fluent, plausible statement produced by the model that is simply not true: a book that does not exist, a legal case that was never filed, a function that is not in the library, a statistic with the wrong number. The name is a bit dramatic; "confident guess" is closer to the truth.</p>
+      <p>Given everything so far, the cause is not mysterious. The model's job is to produce the most plausible next token. If you ask for the title of a paper by a particular author, then a plausible-looking title is exactly what the loop will produce, whether or not such a paper exists. Nothing in the loop checks against reality. There is no database lookup step, and there is no separate "do I actually know this?" step. The model's confidence comes from its fluency, and its fluency is the same whether it is right or wrong.</p>
+
+      <div class="box analogy">
+        <span class="label">Analogy</span>
+        <p>Think of a charming dinner guest who has read widely and hates saying "I don't know". Ask them about a village they have never visited and they will describe its charming church and Tuesday market with perfect assurance, because that is what villages are usually like. They are not lying; they are pattern-completing. The pattern is usually right, which is exactly what makes the wrong cases dangerous.</p>
+      </div>
+
+      <h3>When it gets worse</h3>
+      <div class="cards">
+        <div class="card"><h4>Obscure facts</h4><p>The rarer a topic was in the training data, the weaker the model's actual knowledge and the more it fills gaps with the typical pattern.</p></div>
+        <div class="card"><h4>Citations and quotes</h4><p>Titles, authors, URLs and page numbers have a very regular shape, so inventing a convincing one is easy. Verify every reference.</p></div>
+        <div class="card"><h4>Numbers</h4><p>Digits are tokens like any other. A plausible-looking figure is often preferred over the exact one, especially in long tables.</p></div>
+        <div class="card"><h4>Recent events</h4><p>Anything after the knowledge cutoff (Step 8) is a guess dressed as a fact, unless the app supplies the information.</p></div>
+        <div class="card"><h4>Leading questions</h4><p>"Why did X cause Y?" invites an explanation even when X did not cause Y. The premise is accepted because agreeing is the fluent continuation.</p></div>
+        <div class="card"><h4>Long answers</h4><p>Each token is a small gamble. The more tokens, the more chances for one wrong turn that the rest of the answer then builds on.</p></div>
+      </div>
+
+      <h3>Defences that work</h3>
+      <ol>
+        <li><strong>Put the source in the window.</strong> If the answer must come from a document, paste the document (or the relevant parts) into the context. The model is far more reliable when it is <em>reading</em> than when it is <em>recalling</em>. Doing this automatically at scale is retrieval-augmented generation, RAG, the subject of Part 3.</li>
+        <li><strong>Ask for citations to the provided text.</strong> "Quote the sentence you used" makes fabrication harder and makes checking easier.</li>
+        <li><strong>Allow "I don't know".</strong> Tell the model explicitly that saying it cannot find the answer is acceptable. Preference tuning makes models eager to please; permission to decline counteracts it.</li>
+        <li><strong>Verify with tools.</strong> Let the model call a calculator, a search engine or a database rather than guess (Part 4).</li>
+        <li><strong>Measure it.</strong> Build a set of questions with known answers and check the failure rate every time you change something. That is an eval (Part 5), and hallucination rate is one of the most common things to measure.</li>
+      </ol>
+
+      <div class="box warn">
+        <span class="label">Watch out</span>
+        <p>Asking the model "Are you sure?" is a weak check. The model answers with the most plausible response to being asked whether it is sure, which is often "Yes, I am sure" or an equally confident correction that is also wrong. Verification has to come from outside the model: a document, a tool, a test, or a human.</p>
+      </div>
+
+      <div class="box doubt">
+        <span class="label">Common doubt</span>
+        <p><strong>"Will bigger models fix hallucination?"</strong> Larger and better-trained models hallucinate less, and preference tuning can teach a model to hedge more often. But as long as the core mechanism is "produce the most plausible continuation" with no built-in check against the world, the rate cannot reach zero. Plan your product around the failure being possible.</p>
+      </div>
+
+      <div class="box key">
+        <span class="label">Key idea</span>
+        <p>Hallucination is not a bug in an otherwise fact-checking system. It is the normal behaviour of a text predictor when the plausible continuation happens to be false. Reduce it by giving the model the facts, permission to abstain, tools to check, and by measuring the rate.</p>
+      </div>
+    </section>
+
+    <!-- ===================== CHAPTER 8 ===================== -->
+    <section class="chapter" id="c8">
+      <div class="chapter-head">
+        <div class="eyebrow">Step 8 · Honest limits</div>
+        <h2>What a model cannot do on its own</h2>
+        <p class="goal">A short list of built-in limits. Every one of them can be worked around by the application, and later guides show how, but the raw model has none of these abilities.</p>
+      </div>
+
+      <div class="tbl"><table aria-label="Built-in limits of a language model and the usual workaround">
+        <thead><tr><th>Limit</th><th>Why (from this guide)</th><th>Usual workaround</th></tr></thead>
+        <tbody>
+          <tr><td>No knowledge after its <strong>knowledge cutoff</strong></td><td>All knowledge came from pre-training text, which ended on a date (Step 5).</td><td>Paste in fresh information, or give it a search tool (Parts 3 and 4).</td></tr>
+          <tr><td>No memory between conversations</td><td>Parameters are frozen; only the context window exists (Steps 3, 5).</td><td>The app stores notes and re-inserts them into the window.</td></tr>
+          <tr><td>Unreliable arithmetic</td><td>Digits are tokens; it predicts plausible digits, it does not calculate (Step 1).</td><td>Give it a calculator or code tool and ask it to use it (Part 4).</td></tr>
+          <tr><td>Cannot browse, click, send email or run code</td><td>The loop only ever outputs tokens (Step 2).</td><td>Tools: the app watches for a special token pattern and performs the action (Part 4).</td></tr>
+          <tr><td>Inherits bias from its training data</td><td>It reproduces patterns in the text it read, including unfair ones (Step 5).</td><td>Preference tuning, careful prompts, evals for fairness, human review (Parts 5 and 7).</td></tr>
+          <tr><td>Cannot see letters, count precisely, or reverse strings reliably</td><td>It reads tokens, not characters (Step 1).</td><td>Do string operations in ordinary code.</td></tr>
+          <tr><td>Cannot tell you how confident it really is</td><td>Its confidence is fluency, not a calibrated measure (Step 7).</td><td>Verify externally; measure hallucination rate with evals (Part 5).</td></tr>
+        </tbody>
+      </table></div>
+
+      <p>None of this makes the model useless. It means the model is one component. Around it sits an application that decides what goes in the window, watches what comes out, runs tools when asked, stores memory, and checks results. Most of the work of "building with LLMs" is building that surrounding application well.</p>
+
+      <div class="box analogy">
+        <span class="label">Analogy</span>
+        <p>A brilliant new colleague arrives who has read everything up to a certain date, has no phone, no computer, no calendar and no memory of yesterday, and can only communicate through notes passed under the door. You would not fire them. You would build a workflow around them: put the right papers under the door, give them a calculator, write down what they said yesterday, and check the numbers before sending anything to a customer. That workflow is the rest of this series.</p>
+      </div>
+
+      <div class="box doubt">
+        <span class="label">Common doubt</span>
+        <p><strong>"But the chat app I use does browse the web and remember me."</strong> Yes, the <em>app</em> does. It uses tools (Part 4) to fetch pages and pastes the results into the window, and it keeps a memory store that it re-inserts. The underlying model still only predicts tokens. Knowing where the model ends and the app begins helps you understand which failures are which.</p>
+      </div>
+
+      <div class="box key">
+        <span class="label">Key idea</span>
+        <p>The raw model reads a window of tokens and writes tokens. Everything else, from memory to browsing to arithmetic, is added by the software around it. When a product "can" or "cannot" do something, ask which layer is responsible.</p>
+      </div>
+    </section>
+
+    <!-- ===================== CHAPTER 9 ===================== -->
+    <section class="chapter" id="c9">
+      <div class="chapter-head">
+        <div class="eyebrow">Step 9 · Choosing</div>
+        <h2>The model landscape: size, openness, reasoning, modality</h2>
+        <p class="goal">You will hear a lot of model names. Ignore them for now and learn the four axes along which models really differ.</p>
+      </div>
+
+      <h3>Size: quality versus speed versus cost</h3>
+      <p>Model size is counted in parameters. As a loose rule, more parameters means better quality: more nuance, more knowledge, fewer mistakes on hard tasks. The price is that every token requires more arithmetic, so large models are slower per token, need bigger and more expensive hardware, and cost more to run. Small models answer quickly and cheaply and are perfectly good at simple, well-defined jobs such as classifying a support ticket or extracting a date from an email.</p>
+
+      <div class="diagram narrow">
+        <svg viewBox="0 0 560 300" role="img" aria-label="Three model sizes compared on quality, speed and cost with rough bars">
+          <g font-family="var(--display)" font-weight="700" font-size="14">
+            <text x="20" y="34" fill="var(--ink)">Rule of thumb, not a measurement</text>
+          </g>
+          <g class="svg-sub" font-size="12">
+            <text x="20" y="80">quality</text>
+            <text x="20" y="150">speed</text>
+            <text x="20" y="220">cost per token</text>
+            <text x="20" y="272" font-size="11">Cost means what it takes to run the model:</text>
+            <text x="20" y="288" font-size="11">your bill for a hosted model, or your own hardware.</text>
+          </g>
+          <!-- column labels -->
+          <g font-family="var(--display)" font-weight="700" font-size="13" text-anchor="middle">
+            <text x="200" y="58" fill="var(--ink-2)">Small</text>
+            <text x="330" y="58" fill="var(--ink-2)">Medium</text>
+            <text x="460" y="58" fill="var(--ink-2)">Large</text>
+          </g>
+          <!-- quality -->
+          <g>
+            <rect x="160" y="66" width="80" height="18" rx="5" fill="var(--surface-2)" stroke="var(--line)"></rect><rect x="160" y="66" width="32" height="18" rx="5" fill="var(--accent)"></rect>
+            <rect x="290" y="66" width="80" height="18" rx="5" fill="var(--surface-2)" stroke="var(--line)"></rect><rect x="290" y="66" width="56" height="18" rx="5" fill="var(--accent)"></rect>
+            <rect x="420" y="66" width="80" height="18" rx="5" fill="var(--surface-2)" stroke="var(--line)"></rect><rect x="420" y="66" width="78" height="18" rx="5" fill="var(--accent)"></rect>
+          </g>
+          <!-- speed -->
+          <g>
+            <rect x="160" y="136" width="80" height="18" rx="5" fill="var(--surface-2)" stroke="var(--line)"></rect><rect x="160" y="136" width="78" height="18" rx="5" fill="var(--good)"></rect>
+            <rect x="290" y="136" width="80" height="18" rx="5" fill="var(--surface-2)" stroke="var(--line)"></rect><rect x="290" y="136" width="50" height="18" rx="5" fill="var(--good)"></rect>
+            <rect x="420" y="136" width="80" height="18" rx="5" fill="var(--surface-2)" stroke="var(--line)"></rect><rect x="420" y="136" width="24" height="18" rx="5" fill="var(--good)"></rect>
+          </g>
+          <!-- cost -->
+          <g>
+            <rect x="160" y="206" width="80" height="18" rx="5" fill="var(--surface-2)" stroke="var(--line)"></rect><rect x="160" y="206" width="12" height="18" rx="5" fill="var(--judge)"></rect>
+            <rect x="290" y="206" width="80" height="18" rx="5" fill="var(--surface-2)" stroke="var(--line)"></rect><rect x="290" y="206" width="36" height="18" rx="5" fill="var(--judge)"></rect>
+            <rect x="420" y="206" width="80" height="18" rx="5" fill="var(--surface-2)" stroke="var(--line)"></rect><rect x="420" y="206" width="78" height="18" rx="5" fill="var(--judge)"></rect>
+          </g>
+          <g class="svg-sub" font-size="11" text-anchor="middle">
+            <text x="200" y="104">runs on a laptop</text>
+            <text x="330" y="104">one good GPU</text>
+            <text x="460" y="104">a rack of GPUs</text>
+            <text x="200" y="244">fine for simple, narrow jobs</text>
+            <text x="460" y="244">for hard, open-ended work</text>
+          </g>
+        </svg>
+        <p class="cap">The trade-off in one picture. Bigger models are better and slower and dearer, all at once. The skill is matching the model to the difficulty of the job, not always buying the largest.</p>
+      </div>
+
+      <h3>Open-weight versus hosted API</h3>
+      <p>An <strong>open-weight</strong> model is one whose parameter file has been published. Anyone can download it and run it on their own hardware, fine-tune it, or inspect it. A <strong>hosted API</strong> model runs on the provider's servers; you send text over the internet and receive text back, paying per token, and you never see the parameters. Hosted models are usually the largest and most capable and require no hardware; open-weight models give you control, privacy and predictable cost, at the price of running the infrastructure yourself. Many teams use both: a hosted model for hard tasks, a small open-weight model for high-volume simple ones.</p>
+
+      <div class="tbl"><table aria-label="Open-weight versus hosted API models">
+        <thead><tr><th></th><th>Open-weight, run yourself</th><th>Hosted API</th></tr></thead>
+        <tbody>
+          <tr><td>Data leaves your machines?</td><td class="yes">No</td><td class="mid">Yes, to the provider</td></tr>
+          <tr><td>Setup effort</td><td class="mid">GPUs, serving software, updates</td><td class="yes">An API key</td></tr>
+          <tr><td>Top quality available</td><td class="mid">Usually a step behind</td><td class="yes">Usually the best</td></tr>
+          <tr><td>Can you fine-tune it freely?</td><td class="yes">Yes, fully</td><td class="mid">Only what the provider offers</td></tr>
+          <tr><td>Cost model</td><td>Hardware, whether busy or idle</td><td>Per token, scales with use</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3>Reasoning models</h3>
+      <p>A <strong>reasoning model</strong> is trained to write out intermediate steps, as ordinary tokens, before giving its final answer. Instead of answering "What is 17 times 24?" in one shot, it writes "17 times 20 is 340, 17 times 4 is 68, total 408" and then answers. The app often hides those thinking tokens from you. This helps a lot on maths, logic, planning and code, because it gives the next-token loop somewhere to work things out. The cost is real: those extra tokens take time and money. For a simple lookup or a friendly chat reply, a reasoning model is slower for no benefit.</p>
+
+      <h3>Multimodal models</h3>
+      <p>A <strong>multimodal</strong> model accepts more than text: images, sometimes audio or video, and sometimes produces them too. Under the hood the trick is the same one from Step 1: a picture is chopped into patches and each patch becomes a token-like piece, so the same loop can "read" a photo of a receipt or a diagram. Image tokens can be expensive, so a single photo may cost as much as several paragraphs of text.</p>
+
+      <h3>Small models on your own machine</h3>
+      <p>Small open-weight models can now run on an ordinary laptop or phone. They are weaker than the giants but they cost nothing per token, work offline and never send data anywhere. For a hobby project, for privacy-sensitive data, or for a narrow task like tagging notes, they are often the right choice. The Production guide (Part 8) covers the serving software that makes this practical.</p>
+
+      <div class="box analogy">
+        <span class="label">Analogy</span>
+        <p>Choosing a model is like choosing transport. A bicycle (small model) is cheap, fast for short trips and needs no fuel, but you would not cross a continent on one. A jet (large hosted model) will take you anywhere but you pay per seat and follow the airline's schedule. Owning a car (open-weight model) means buying and maintaining it, but you go where you like with nobody watching. A reasoning model is the option where the driver stops to study the map first: slower to leave, less likely to get lost.</p>
+      </div>
+
+      <div class="box doubt">
+        <span class="label">Common doubt</span>
+        <p><strong>"Should I always pick the newest, biggest model?"</strong> Start with a capable model to find out whether the task is possible at all, then try to move to something smaller and cheaper once you have an eval (Part 5) that tells you when quality drops. Many production systems run most of their traffic on a mid-sized or small model and route only the hard cases to a large one.</p>
+      </div>
+
+      <div class="box key">
+        <span class="label">Key idea</span>
+        <p>Models differ along four axes: size (quality versus speed and cost), openness (control versus convenience), reasoning (thinking tokens versus latency) and modality (text only versus images and audio). Names and version numbers change every few months; these four axes do not.</p>
+      </div>
+    </section>
+
+    <!-- ===================== CHAPTER 10 ===================== -->
+    <section class="chapter" id="c10">
+      <div class="chapter-head">
+        <div class="eyebrow">Step 10 · Check yourself</div>
+        <h2>Quiz and glossary</h2>
+        <p class="goal">Six quick questions to test the mental model, then every term from this guide in one place.</p>
+      </div>
+
+      <div class="quiz" id="quiz"></div>
+
+      <h3>Glossary</h3>
+      <dl class="gloss">
+        <dt>Attention</dt><dd>The part of a transformer that lets each token look at every other token in the context and weigh how relevant each one is. It is how "it" comes to mean "the cat".</dd>
+        <dt>Base model</dt><dd>The model straight after pre-training. It continues text but does not follow instructions or behave like an assistant.</dd>
+        <dt>Chat model</dt><dd>A model that has been through instruction tuning and preference tuning, so it answers questions helpfully and stops when done.</dd>
+        <dt>Context window</dt><dd>The maximum number of tokens the model can read at once: system prompt, conversation, documents and the answer in progress. Its entire working memory.</dd>
+        <dt>Embedding</dt><dd>A list of numbers that represents a token (or a whole text) as a point in a "meaning space", where similar meanings are close together.</dd>
+        <dt>Fine-tuning</dt><dd>Continuing to train an existing model on a smaller, chosen dataset to change its behaviour or specialise it.</dd>
+        <dt>GPU</dt><dd>Graphics processing unit. A chip that does huge numbers of multiplications in parallel; the hardware models are trained and run on.</dd>
+        <dt>Greedy decoding</dt><dd>Always choosing the single most likely next token. What temperature 0 means in practice.</dd>
+        <dt>Hallucination</dt><dd>A fluent, plausible statement from the model that is not true. The normal behaviour of a text predictor when the plausible continuation is false.</dd>
+        <dt>Hosted API</dt><dd>A model that runs on the provider's servers. You send text over the internet and pay per token; you never see the parameters.</dd>
+        <dt>Inference</dt><dd>Running a trained model to get answers, as opposed to training it. The parameters do not change during inference.</dd>
+        <dt>Instruction tuning</dt><dd>Fine-tuning on example question-and-answer pairs so the model learns to follow instructions. Also called supervised fine-tuning.</dd>
+        <dt>Knowledge cutoff</dt><dd>The date after which the model's training text ends. It knows nothing later than this unless the app supplies it.</dd>
+        <dt>Large language model (LLM)</dt><dd>A very large neural network trained on huge amounts of text to predict the next token, and then tuned to be a useful assistant.</dd>
+        <dt>Latency</dt><dd>How long you wait for a response, or for the first token of it. Bigger models and longer contexts increase it.</dd>
+        <dt>Layer</dt><dd>One stage in the neural network. Each layer transforms the output of the previous one; large models have dozens.</dd>
+        <dt>Max tokens</dt><dd>A hard limit on how many tokens the model may write in one answer. When hit, the answer is cut off.</dd>
+        <dt>Multimodal</dt><dd>A model that accepts (and sometimes produces) more than text, such as images or audio, by turning them into token-like pieces.</dd>
+        <dt>Neural network</dt><dd>A large arithmetic formula with millions or billions of adjustable parameters, tuned automatically during training.</dd>
+        <dt>Open-weight</dt><dd>A model whose parameter file is published, so anyone can download, run, inspect and fine-tune it.</dd>
+        <dt>Parameter / weight</dt><dd>One adjustable number inside the model. "Seven billion parameters" means seven billion such dials, set by training.</dd>
+        <dt>Preference tuning</dt><dd>Training the model on human (or model) judgements of which of two answers is better, so it learns the style people prefer. RLHF is one method.</dd>
+        <dt>Pre-training</dt><dd>The first and most expensive training stage: predicting the next token across trillions of tokens of text. Produces the base model and all of its knowledge.</dd>
+        <dt>Probability distribution</dt><dd>A list of percentages, one per possible next token, adding up to 100%. The model's output at every step of the loop.</dd>
+        <dt>Prompt</dt><dd>The text you send to the model: your question or instruction plus any context. The subject of Part 2.</dd>
+        <dt>RAG</dt><dd>Retrieval-augmented generation: search your documents first, paste the relevant parts into the context, then let the model answer from them. Part 3.</dd>
+        <dt>Reasoning model</dt><dd>A model trained to write out intermediate thinking as tokens before its final answer. Better at maths and planning, slower and costlier.</dd>
+        <dt>RLHF</dt><dd>Reinforcement learning from human feedback. A preference-tuning method where the model learns from a reward built from human comparisons of answers.</dd>
+        <dt>Sampling</dt><dd>Choosing one next token at random, weighted by the probabilities. Temperature and top-p change how this is done.</dd>
+        <dt>Stop sequence / stop token</dt><dd>A stop sequence is a string that ends the answer as soon as the model produces it, such as a newline or "User:". The stop token is the model's own invisible "I am finished" token, learned during instruction tuning.</dd>
+        <dt>System prompt</dt><dd>Hidden instructions from the application, placed at the top of the context, that set the model's role and rules.</dd>
+        <dt>Temperature</dt><dd>A setting that sharpens (low) or flattens (high) the probabilities before sampling. Low is predictable, high is creative and riskier.</dd>
+        <dt>Throughput</dt><dd>How many tokens per second a system produces across all users. A measure of serving capacity.</dd>
+        <dt>Token</dt><dd>A piece of text, roughly three quarters of an English word, that the model reads and writes. Everything is counted in tokens.</dd>
+        <dt>Tokenizer</dt><dd>The small program that splits text into tokens and maps each one to an ID number, and back again.</dd>
+        <dt>Tool / tool use</dt><dd>Letting the model request an action (search, calculator, code) in a special format that the app carries out and reports back. Part 4.</dd>
+        <dt>Top-p</dt><dd>Nucleus sampling: keep only the most likely tokens whose probabilities add up to p, discard the rest, then sample.</dd>
+        <dt>Training data</dt><dd>The text a model learned from during pre-training. Its knowledge, style and biases all come from here.</dd>
+        <dt>Transformer</dt><dd>The neural network design used by almost all modern LLMs, built around attention layers.</dd>
+        <dt>Vocabulary</dt><dd>The fixed list of all tokens a tokenizer knows, typically tens of thousands to a couple of hundred thousand entries.</dd>
+      </dl>
+
+      <div class="box tip">
+        <span class="label">Where to go next</span>
+        <p>You now have the mental model that the rest of the series relies on: a text predictor that sees tokens, reads only its context window, and rolls weighted dice one token at a time. The natural next step is to learn how to write the text you put in front of it. <a href="02-prompt-engineering.html">Part 2, Prompt Engineering</a>, turns everything from Steps 2, 3 and 6 into practical techniques for getting reliable answers.</p>
+      </div>
+    </section>
+
+    <div class="pager">
+      <a class="prev" href="index.html"><span class="dir">Previous</span><span class="t">All guides</span></a>
+      <a class="next" href="02-prompt-engineering.html"><span class="dir">Next</span><span class="t">Prompt Engineering</span></a>
+    </div>
+    <footer class="footer">How LLMs Work, part 1 of the LLM Study Guides. Written in plain language for beginners. Numbers are rounded rules of thumb, not exact citations.</footer>
+  </main>
+</div>
+
+<script>
+/* ---------- PAGE-SPECIFIC SCRIPT: define window.QUIZ here and wire up this page's playgrounds ---------- */
+window.QUIZ = [
+  {
+    q: 'A model is asked "How many letters are in the word strawberry?" and gets it wrong. Which idea best explains this?',
+    opts: ['The model has a small context window', 'The model reads tokens, not letters, so it never sees the individual characters', 'The temperature was set too high'],
+    a: 1,
+    exp: 'Step 1: the tokenizer turns "strawberry" into a few chunks. The model works with those chunks and has no direct view of the letters inside them.'
+  },
+  {
+    q: 'You ask the same question twice and get two different answers. What is the main reason?',
+    opts: ['The model learned from your first question and changed its mind', 'The next token is sampled from a probability list, so different runs can pick different tokens', 'The context window was full'],
+    a: 1,
+    exp: 'Step 2: at every step one token is picked at random, weighted by probability. An early difference changes everything after it. Parameters never change during a chat.'
+  },
+  {
+    q: 'After a very long conversation, the assistant no longer remembers what you said at the start. Why?',
+    opts: ['The oldest messages no longer fit in the context window and were not sent to the model', 'The model deletes memories after an hour', 'The knowledge cutoff was reached'],
+    a: 0,
+    exp: 'Step 3: the model only sees what is in the window. When the conversation outgrows it, the app drops or summarises the oldest parts.'
+  },
+  {
+    q: 'Which training stage gives a model almost all of its factual knowledge?',
+    opts: ['Preference tuning (RLHF)', 'Instruction tuning', 'Pre-training on a huge pile of text'],
+    a: 2,
+    exp: 'Step 5: pre-training on trillions of tokens is where knowledge comes from. The later stages mostly teach format and manners.'
+  },
+  {
+    q: 'You want a model to extract dates from emails, exactly the same way every time. Which setting helps most?',
+    opts: ['A low temperature, close to 0', 'A high temperature, around 1.8', 'A larger max tokens value'],
+    a: 0,
+    exp: 'Step 6: low temperature makes the most likely token win nearly every time, which gives repeatable output. Max tokens only limits length.'
+  },
+  {
+    q: 'The model produces a very plausible reference to a paper that does not exist. What is the best defence?',
+    opts: ['Ask the model "Are you sure?"', 'Give it the real source documents in the context and ask it to quote them', 'Increase the temperature so it is more creative'],
+    a: 1,
+    exp: 'Step 7: a model is far more reliable when reading than when recalling. Asking it whether it is sure just produces another plausible continuation.'
+  }
+];
+
+(function () {
+  /* ---------- Playground 1: token estimator ---------- */
+  var tokIn = document.getElementById('tokIn');
+  var tokResults = document.getElementById('tokResults');
+  var tokPreview = document.getElementById('tokPreview');
+
+  function escapeHtml(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  // Splits text into rough token-like pieces. Whitespace is attached to the piece that follows it,
+  // which is how most real tokenizers behave. This is a heuristic, not a real tokenizer.
+  function estimatePieces(text) {
+    var pieces = [];
+    var re = /\s*(\d+|[A-Za-zÀ-ɏ']+|[^\sA-Za-z\dÀ-ɏ'])/g;
+    var m, raw, core, lead, i, n, size;
+    while ((m = re.exec(text)) !== null) {
+      raw = m[0]; core = m[1];
+      lead = raw.slice(0, raw.length - core.length);
+      if (/^[A-Za-zÀ-ɏ']+$/.test(core)) {
+        if (core.length <= 5) { pieces.push(raw); }
+        else {
+          n = Math.ceil(core.length / 4);
+          size = Math.ceil(core.length / n);
+          for (i = 0; i < core.length; i += size) { pieces.push((i === 0 ? lead : '') + core.slice(i, i + size)); }
+        }
+      } else if (/^\d+$/.test(core)) {
+        for (i = 0; i < core.length; i += 3) { pieces.push((i === 0 ? lead : '') + core.slice(i, i + 3)); }
+      } else {
+        pieces.push(raw);
+      }
+    }
+    return pieces;
+  }
+
+  var swatches = ['var(--accent-soft)', 'var(--good-soft)', 'var(--judge-soft)', 'var(--human-soft)'];
+
+  function renderTokens() {
+    var text = tokIn.value;
+    var pieces = estimatePieces(text);
+    var words = text.trim() ? text.trim().split(/\s+/).length : 0;
+    var chars = text.length;
+    var perWord = words ? (pieces.length / words) : 0;
+    var rows = [
+      { name: 'Estimated tokens', val: String(pieces.length), why: 'Approximate. Real tokenizers vary.' },
+      { name: 'Words', val: String(words), why: 'Split on spaces.' },
+      { name: 'Characters', val: String(chars), why: 'Including spaces and punctuation.' },
+      { name: 'Tokens per word', val: words ? perWord.toFixed(2) : '0', why: 'English prose is usually about 1.3.' }
+    ];
+    tokResults.innerHTML = rows.map(function (r) {
+      return '<div class="res"><div class="name">' + r.name + '</div><div class="val">' + r.val + '</div><div class="why">' + r.why + '</div></div>';
+    }).join('');
+    var shown = pieces.slice(0, 600);
+    tokPreview.innerHTML = shown.map(function (p, idx) {
+      return '<span style="background:' + swatches[idx % 4] + ';color:var(--ink);border-radius:4px;padding:1px 2px;margin:0 1px">' + escapeHtml(p) + '</span>';
+    }).join('') + (pieces.length > 600 ? '<span style="color:var(--ink-3)"> ...and ' + (pieces.length - 600) + ' more</span>' : '');
+    if (!pieces.length) { tokPreview.innerHTML = '<span style="color:var(--ink-3)">Type something above to see the pieces.</span>'; }
+  }
+  if (tokIn) { tokIn.addEventListener('input', renderTokens); renderTokens(); }
+
+  /* ---------- Playground 2: temperature and top-p ---------- */
+  var tempIn = document.getElementById('tempIn');
+  var topPIn = document.getElementById('topPIn');
+  var tempVal = document.getElementById('tempVal');
+  var topPVal = document.getElementById('topPVal');
+  var tempBars = document.getElementById('tempBars');
+  var tempExplain = document.getElementById('tempExplain');
+  var sampleBtn = document.getElementById('sampleBtn');
+  var sampleReset = document.getElementById('sampleReset');
+  var sampleOut = document.getElementById('sampleOut');
+  var samples = [];
+
+  // Fixed raw scores for six candidate next tokens after "The capital of France is".
+  var candidates = [
+    { t: 'Paris', s: 4.0 },
+    { t: 'a', s: 2.4 },
+    { t: 'the', s: 2.0 },
+    { t: 'home', s: 1.5 },
+    { t: 'Lyon', s: 1.0 },
+    { t: 'lovely', s: 0.2 }
+  ];
+
+  function computeProbs(T, p) {
+    var exps = candidates.map(function (c) { return Math.exp(c.s / T); });
+    var sum = exps.reduce(function (a, b) { return a + b; }, 0);
+    var probs = candidates.map(function (c, i) { return { t: c.t, p: exps[i] / sum, kept: false }; });
+    // top-p: keep the most likely tokens until their total reaches p
+    var order = probs.slice().sort(function (a, b) { return b.p - a.p; });
+    var acc = 0;
+    for (var i = 0; i < order.length; i++) {
+      order[i].kept = true;
+      acc += order[i].p;
+      if (acc >= p - 1e-9) break;
+    }
+    return probs;
+  }
+
+  function renderTemp() {
+    var T = parseFloat(tempIn.value);
+    var p = parseFloat(topPIn.value);
+    tempVal.textContent = T.toFixed(1);
+    topPVal.textContent = p.toFixed(2);
+    var probs = computeProbs(T, p);
+    tempBars.innerHTML = probs.map(function (x) {
+      var w = Math.max(1, Math.round(x.p * 100));
+      var fillStyle = x.kept ? '' : 'background:var(--ink-3);opacity:.45;';
+      var lbl = x.kept ? x.t : x.t + ' (cut)';
+      return '<div class="bar-row"><span class="lbl" title="' + lbl + '">' + lbl + '</span><div class="track"><div class="fill" style="width:' + w + '%;' + fillStyle + '"></div></div><span class="pct">' + (x.p * 100).toFixed(1) + '%</span></div>';
+    }).join('');
+    var keptCount = probs.filter(function (x) { return x.kept; }).length;
+    var winner = probs[0];
+    var text;
+    if (T <= 0.3) { text = 'Low temperature: "' + winner.t + '" takes ' + (winner.p * 100).toFixed(1) + '% of the probability. Almost every run will produce the same token. Predictable, but not necessarily correct.'; }
+    else if (T < 1.3) { text = 'Moderate temperature: "' + winner.t + '" is chosen about ' + (winner.p * 100).toFixed(0) + '% of the time, so roughly ' + Math.round(100 - winner.p * 100) + ' runs in 100 start differently.'; }
+    else { text = 'High temperature: the bars have flattened. "' + winner.t + '" only wins ' + (winner.p * 100).toFixed(0) + '% of the time and odd tokens like "lovely" get real chances. Creative, and increasingly incoherent.'; }
+    text += ' Top-p ' + p.toFixed(2) + ' keeps ' + keptCount + ' of 6 candidates' + (keptCount < 6 ? '; the grey ones can never be sampled.' : '; nothing is cut.');
+    tempExplain.textContent = text;
+  }
+
+  function sampleOnce() {
+    var probs = computeProbs(parseFloat(tempIn.value), parseFloat(topPIn.value)).filter(function (x) { return x.kept; });
+    var total = probs.reduce(function (a, x) { return a + x.p; }, 0);
+    var r = Math.random() * total, acc = 0, pick = probs[probs.length - 1].t;
+    for (var i = 0; i < probs.length; i++) { acc += probs[i].p; if (r <= acc) { pick = probs[i].t; break; } }
+    samples.push(pick);
+    if (samples.length > 12) samples = samples.slice(samples.length - 12);
+    sampleOut.textContent = 'Picked: ' + samples.join(', ');
+  }
+
+  if (tempIn) {
+    tempIn.addEventListener('input', renderTemp);
+    topPIn.addEventListener('input', renderTemp);
+    sampleBtn.addEventListener('click', sampleOnce);
+    sampleReset.addEventListener('click', function () { samples = []; sampleOut.textContent = ''; });
+    renderTemp();
+  }
+})();
+</script>
+<script>
+/* ---------- Shared behaviour for every guide (do not remove) ---------- */
+(function () {
+  var root = document.documentElement;
+  var btn = document.getElementById('themeBtn');
+  try { var saved = localStorage.getItem('llm-guides-theme'); if (saved) root.setAttribute('data-theme', saved); } catch (e) {}
+  btn.addEventListener('click', function () {
+    var isDark = root.getAttribute('data-theme') === 'dark' ||
+      (!root.getAttribute('data-theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    var next = isDark ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem('llm-guides-theme', next); } catch (e) {}
+  });
+
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    document.querySelectorAll('svg').forEach(function (s) { if (s.pauseAnimations) s.pauseAnimations(); });
+  }
+
+  var progress = document.getElementById('progress');
+  function onScroll() {
+    var h = document.documentElement;
+    var max = h.scrollHeight - h.clientHeight;
+    progress.style.width = (max > 0 ? (h.scrollTop / max) * 100 : 0) + '%';
+  }
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+
+  var links = Array.prototype.slice.call(document.querySelectorAll('#toc a'));
+  var sections = links.map(function (a) { return document.querySelector(a.getAttribute('href')); });
+  function setActive(id) {
+    links.forEach(function (a) {
+      var on = a.getAttribute('href') === '#' + id;
+      a.classList.toggle('active', on);
+      if (on && window.innerWidth < 1000 && a.scrollIntoView) {
+        a.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+      }
+    });
+  }
+  if ('IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) { if (en.isIntersecting) setActive(en.target.id); });
+    }, { rootMargin: '-30% 0px -60% 0px', threshold: 0 });
+    sections.forEach(function (s) { if (s) io.observe(s); });
+  }
+
+  /* Quiz engine: define window.QUIZ = [{q, opts:[...], a: indexOfCorrect, exp}] and a <div class="quiz" id="quiz"></div> */
+  var quiz = window.QUIZ || [];
+  var qEl = document.getElementById('quiz');
+  if (qEl && quiz.length) {
+    qEl.innerHTML = quiz.map(function (q, i) {
+      return '<div class="q" data-i="' + i + '"><div class="qt">' + (i + 1) + '. ' + q.q + '</div><div class="opts">' +
+        q.opts.map(function (o, j) { return '<button type="button" data-j="' + j + '">' + o + '</button>'; }).join('') +
+        '</div><div class="exp"></div></div>';
+    }).join('');
+    qEl.addEventListener('click', function (e) {
+      var b = e.target.closest('button'); if (!b) return;
+      var qBox = b.closest('.q'); var i = +qBox.dataset.i, j = +b.dataset.j;
+      var buttons = qBox.querySelectorAll('button');
+      buttons.forEach(function (x) { x.classList.remove('right', 'wrong'); });
+      if (j === quiz[i].a) { b.classList.add('right'); qBox.querySelector('.exp').textContent = 'Correct. ' + quiz[i].exp; }
+      else { b.classList.add('wrong'); buttons[quiz[i].a].classList.add('right'); qBox.querySelector('.exp').textContent = 'Not quite. ' + quiz[i].exp; }
+    });
+  }
+})();
+</script>
+</body>
+</html>

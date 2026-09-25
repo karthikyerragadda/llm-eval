@@ -1,0 +1,1661 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tools and Agents</title>
+<meta name="description" content="A plain-language guide to how language models use tools, how agents loop, how they remember, what MCP is, and how to keep agents safe.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+  /* ---------- Tokens ---------- */
+  :root {
+    color-scheme: light;
+    --bg: #F5F6FB;
+    --surface: #FFFFFF;
+    --surface-2: #ECEEF8;
+    --ink: #1A1D33;
+    --ink-2: #4A4F6A;
+    --ink-3: #7A7F9A;
+    --line: #D9DCEC;
+    --accent: #3B4FE0;
+    --accent-ink: #2B3BB3;
+    --accent-soft: #E3E7FF;
+    --good: #0E9E8A;
+    --good-soft: #D6F4EE;
+    --bad: #E0544C;
+    --bad-soft: #FCE3E1;
+    --judge: #C8820A;
+    --judge-soft: #FFF0D2;
+    --human: #8A4FD6;
+    --human-soft: #EEE4FF;
+    --code-bg: #1C1F3A;
+    --code-ink: #E8EAF6;
+    --shadow: 0 1px 2px rgba(26,29,51,.06), 0 8px 24px rgba(26,29,51,.06);
+    --radius: 14px;
+    --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+    --body: "Atkinson Hyperlegible", "Helvetica Neue", Arial, system-ui, sans-serif;
+    --mono: "JetBrains Mono", "SFMono-Regular", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #0F1120;
+      --surface: #171A2E;
+      --surface-2: #1F2340;
+      --ink: #E8EAF6;
+      --ink-2: #B7BBD3;
+      --ink-3: #8A8FAB;
+      --line: #2C3050;
+      --accent: #8B9BFF;
+      --accent-ink: #A9B5FF;
+      --accent-soft: #262F5E;
+      --good: #35D6BF;
+      --good-soft: #113C36;
+      --bad: #FF847C;
+      --bad-soft: #4A201D;
+      --judge: #FFB84D;
+      --judge-soft: #4A3610;
+      --human: #BC98FF;
+      --human-soft: #34245A;
+      --code-bg: #0B0D1A;
+      --code-ink: #E8EAF6;
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #0F1120;
+    --surface: #171A2E;
+    --surface-2: #1F2340;
+    --ink: #E8EAF6;
+    --ink-2: #B7BBD3;
+    --ink-3: #8A8FAB;
+    --line: #2C3050;
+    --accent: #8B9BFF;
+    --accent-ink: #A9B5FF;
+    --accent-soft: #262F5E;
+    --good: #35D6BF;
+    --good-soft: #113C36;
+    --bad: #FF847C;
+    --bad-soft: #4A201D;
+    --judge: #FFB84D;
+    --judge-soft: #4A3610;
+    --human: #BC98FF;
+    --human-soft: #34245A;
+    --code-bg: #0B0D1A;
+    --code-ink: #E8EAF6;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
+  }
+
+  /* ---------- Base ---------- */
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 17px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3, h4 { font-family: var(--display); line-height: 1.15; text-wrap: balance; margin: 0; }
+  h1 { font-size: clamp(2.2rem, 5vw, 3.6rem); font-weight: 800; letter-spacing: -.02em; }
+  h2 { font-size: clamp(1.6rem, 3vw, 2.2rem); font-weight: 800; letter-spacing: -.015em; }
+  h3 { font-size: 1.25rem; font-weight: 700; margin-top: 1.6rem; }
+  h4 { font-size: 1.05rem; font-weight: 700; }
+  p { margin: .8rem 0; max-width: 68ch; }
+  ul, ol { max-width: 68ch; padding-left: 1.3rem; }
+  li { margin: .35rem 0; }
+  a { color: var(--accent-ink); }
+  strong { font-weight: 700; }
+  code { font-family: var(--mono); font-size: .88em; background: var(--surface-2); padding: .1em .4em; border-radius: 6px; }
+  pre { background: var(--code-bg); color: var(--code-ink); padding: 1.1rem 1.2rem; border-radius: var(--radius); overflow-x: auto; font-family: var(--mono); font-size: .86rem; line-height: 1.55; margin: 1rem 0; }
+  pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
+  .cm { color: #9BA3D6; }
+  .kw { color: #FFB84D; }
+  .st { color: #7FE3D0; }
+  .fn { color: #B4C1FF; }
+  button { font: inherit; }
+  :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+  /* ---------- Progress bar ---------- */
+  .progress { position: fixed; top: env(safe-area-inset-top, 0px); left: 0; height: 4px; width: 0%; background: var(--accent); z-index: 50; transition: width .15s linear; }
+
+  /* ---------- Layout ---------- */
+  .page { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; max-width: 1240px; margin: 0 auto; padding-inline: 16px; }
+  .toc { min-width: 0; position: sticky; top: env(safe-area-inset-top, 0px); z-index: 40; background: var(--bg); padding-block: 10px; border-bottom: 1px solid var(--line); }
+  .toc-inner { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: thin; padding-bottom: 4px; }
+  .toc-inner a { flex: 0 0 auto; text-decoration: none; color: var(--ink-2); font-size: .82rem; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); white-space: nowrap; font-family: var(--display); font-weight: 500; }
+  .toc-inner a.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .toc-inner a .n { opacity: .6; margin-right: 4px; }
+  main { padding-block: 24px 80px; min-width: 0; }
+  @media (min-width: 1000px) {
+    .page { grid-template-columns: 250px minmax(0, 1fr); gap: 48px; }
+    .toc { align-self: start; top: calc(env(safe-area-inset-top, 0px) + 24px); border-bottom: 0; padding-block: 0; margin-top: 28px; }
+    .toc-inner { flex-direction: column; gap: 2px; overflow: visible; }
+    .toc-inner a { background: none; border: 0; border-left: 3px solid transparent; border-radius: 0; padding: 7px 12px; white-space: normal; }
+    .toc-inner a.active { background: var(--accent-soft); color: var(--accent-ink); border-left-color: var(--accent); }
+  }
+
+  /* ---------- Header ---------- */
+  .hero { padding-block: 24px 12px; }
+  .eyebrow { font-family: var(--display); text-transform: uppercase; letter-spacing: .14em; font-size: .72rem; color: var(--accent-ink); font-weight: 700; }
+  .hero .lead { font-size: 1.15rem; color: var(--ink-2); max-width: 62ch; }
+  .topbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding-block: 12px; border-bottom: 1px solid var(--line); }
+  .brand { font-family: var(--display); font-weight: 800; letter-spacing: -.01em; }
+  .theme-btn { border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 999px; padding: 6px 14px; cursor: pointer; font-size: .85rem; }
+  .theme-btn:hover { border-color: var(--accent); }
+
+  /* Learning path stepper */
+  .path { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-block: 20px 8px; }
+  .path a { text-decoration: none; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: block; transition: transform .15s ease, border-color .15s ease; }
+  .path a:hover { transform: translateY(-2px); border-color: var(--accent); }
+  .path .step { font-family: var(--mono); font-size: .7rem; color: var(--accent-ink); font-weight: 600; }
+  .path .name { font-family: var(--display); font-weight: 700; font-size: .95rem; display: block; margin-top: 2px; }
+
+  /* ---------- Chapters ---------- */
+  .chapter { padding-block: 44px 8px; border-top: 1px solid var(--line); margin-top: 32px; scroll-margin-top: 80px; }
+  .chapter:first-of-type { border-top: 0; margin-top: 0; }
+  .chapter-head { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+  .chapter .goal { color: var(--ink-2); font-size: 1.05rem; max-width: 66ch; }
+
+  /* Boxes */
+  .box { border-radius: var(--radius); padding: 16px 18px; margin: 18px 0; max-width: 78ch; border: 1px solid var(--line); background: var(--surface); }
+  .box p:first-of-type { margin-top: .3rem; }
+  .box p:last-child { margin-bottom: .2rem; }
+  .box .label { font-family: var(--display); text-transform: uppercase; letter-spacing: .12em; font-size: .7rem; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; }
+  .analogy { background: var(--judge-soft); border-color: transparent; }
+  .analogy .label { color: var(--judge); }
+  .key { background: var(--accent-soft); border-color: transparent; }
+  .key .label { color: var(--accent-ink); }
+  .doubt { background: var(--surface); border-left: 4px solid var(--human); }
+  .doubt .label { color: var(--human); }
+  .warn { background: var(--bad-soft); border-color: transparent; }
+  .warn .label { color: var(--bad); }
+  .tip { background: var(--good-soft); border-color: transparent; }
+  .tip .label { color: var(--good); }
+
+  details.deeper { border: 1px dashed var(--line); border-radius: var(--radius); padding: 0 18px; margin: 18px 0; max-width: 78ch; background: var(--surface); }
+  details.deeper summary { cursor: pointer; padding: 14px 0; font-family: var(--display); font-weight: 700; color: var(--accent-ink); list-style: none; display: flex; align-items: center; gap: 10px; }
+  details.deeper summary::-webkit-details-marker { display: none; }
+  details.deeper summary::before { content: "+"; display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--accent-soft); font-size: 1rem; }
+  details.deeper[open] summary::before { content: "–"; }
+  details.deeper > :not(summary) { margin-bottom: 14px; }
+
+  /* Cards */
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin: 16px 0; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .card h4 { margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
+  .card p { font-size: .93rem; color: var(--ink-2); margin: .3rem 0; }
+  .card .ex { font-family: var(--mono); font-size: .78rem; color: var(--ink-3); }
+  .chip { display: inline-block; font-family: var(--display); font-size: .7rem; font-weight: 700; letter-spacing: .04em; padding: 2px 8px; border-radius: 999px; background: var(--surface-2); color: var(--ink-2); }
+  .chip.good { background: var(--good-soft); color: var(--good); }
+  .chip.bad { background: var(--bad-soft); color: var(--bad); }
+  .chip.judge { background: var(--judge-soft); color: var(--judge); }
+  .chip.accent { background: var(--accent-soft); color: var(--accent-ink); }
+  .chip.human { background: var(--human-soft); color: var(--human); }
+
+  /* Diagrams */
+  .diagram { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; margin: 18px 0; overflow-x: auto; }
+  .diagram svg { display: block; min-width: 640px; width: 100%; height: auto; }
+  .diagram.narrow svg { min-width: 0; max-width: 560px; margin: 0 auto; }
+  .diagram .cap { font-size: .85rem; color: var(--ink-3); margin: 10px 4px 0; max-width: none; }
+  .svg-text { font-family: var(--display); font-weight: 700; fill: var(--ink); }
+  .svg-sub { font-family: var(--mono); font-size: 11px; fill: var(--ink-3); }
+  .svg-box { fill: var(--surface-2); stroke: var(--line); }
+  .svg-line { stroke: var(--ink-3); fill: none; }
+
+  /* Exam mapping */
+  .mapping { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin: 16px 0; }
+  .map { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; text-align: center; }
+  .map .from { font-family: var(--display); font-weight: 700; font-size: 1rem; }
+  .map .eq { color: var(--ink-3); font-size: .8rem; margin: 4px 0; }
+  .map .to { display: inline-block; background: var(--accent-soft); color: var(--accent-ink); font-family: var(--display); font-weight: 700; padding: 3px 10px; border-radius: 999px; font-size: .9rem; }
+  .map .icon { font-size: 1.6rem; line-height: 1; }
+
+  /* Compare two columns */
+  .vs { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin: 16px 0; max-width: 80ch; }
+  .vs > div { border-radius: 12px; padding: 14px 16px; }
+  .vs .l { background: var(--bad-soft); }
+  .vs .r { background: var(--good-soft); }
+  .vs h4 { margin-bottom: 6px; }
+  .vs ul { padding-left: 1.1rem; margin: 0; font-size: .95rem; }
+
+  /* Spectrum */
+  .spectrum { margin: 20px 0; }
+  .spectrum .bar { height: 12px; border-radius: 999px; background: linear-gradient(90deg, var(--good), var(--accent), var(--human)); }
+  .spectrum .ends { display: flex; justify-content: space-between; font-family: var(--display); font-weight: 700; font-size: .85rem; margin-top: 6px; }
+  .spectrum .items { display: flex; justify-content: space-between; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .spectrum .items span { font-size: .8rem; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; }
+
+  /* Ladder of graders */
+  .ladder { display: grid; gap: 10px; margin: 16px 0; }
+  .rung { display: grid; grid-template-columns: 44px 1fr; gap: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; align-items: start; }
+  .rung .num { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; font-family: var(--display); font-weight: 800; color: #fff; background: var(--accent); }
+  .rung h4 { margin-bottom: 2px; }
+  .rung p { font-size: .95rem; margin: .3rem 0; }
+  .rung .meters { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 8px; font-size: .75rem; color: var(--ink-3); font-family: var(--display); font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
+  .meter { display: inline-flex; align-items: center; gap: 6px; }
+  .meter i { display: inline-block; width: 70px; height: 6px; border-radius: 999px; background: var(--surface-2); position: relative; overflow: hidden; }
+  .meter i::after { content: ""; position: absolute; inset: 0; width: var(--v); background: var(--accent); border-radius: 999px; }
+  .meter.cost i::after { background: var(--judge); }
+
+  /* Tables */
+  .tbl { overflow-x: auto; margin: 16px 0; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: .93rem; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-family: var(--display); font-weight: 700; background: var(--surface-2); font-size: .82rem; text-transform: uppercase; letter-spacing: .06em; }
+  tr:last-child td { border-bottom: 0; }
+  td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+  /* Playground */
+  .play { background: var(--surface); border: 2px solid var(--accent-soft); border-radius: var(--radius); padding: 18px; margin: 20px 0; }
+  .play .label { color: var(--accent-ink); }
+  .play h4 { margin: 6px 0 10px; }
+  .field { display: grid; gap: 4px; margin: 10px 0; }
+  .field label { font-size: .82rem; font-family: var(--display); font-weight: 700; color: var(--ink-2); }
+  .field input, .field textarea { font: inherit; font-size: .95rem; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); width: 100%; }
+  .field input:focus, .field textarea:focus { border-color: var(--accent); }
+  .results { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-top: 12px; }
+  .res { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--bg); }
+  .res .name { font-family: var(--display); font-weight: 700; font-size: .85rem; }
+  .res .val { font-family: var(--mono); font-size: 1.3rem; font-weight: 600; font-variant-numeric: tabular-nums; margin: 4px 0; }
+  .res .why { font-size: .78rem; color: var(--ink-3); }
+  .res.pass .val { color: var(--good); }
+  .res.fail .val { color: var(--bad); }
+  .grid4 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; max-width: 420px; }
+  .grid4 .field { margin: 0; }
+  .btn { background: var(--accent); color: #fff; border: 0; border-radius: 10px; padding: 9px 16px; font-family: var(--display); font-weight: 700; cursor: pointer; }
+  .btn.ghost { background: var(--surface-2); color: var(--ink); }
+  .btn:hover { filter: brightness(1.08); }
+
+  /* Confusion matrix visual */
+  .cm-grid { display: grid; grid-template-columns: 90px 1fr 1fr; gap: 6px; max-width: 460px; margin-top: 12px; font-size: .85rem; }
+  .cm-grid .h { font-family: var(--display); font-weight: 700; color: var(--ink-2); display: grid; place-items: center; text-align: center; }
+  .cm-grid .cell { border-radius: 10px; padding: 10px; text-align: center; }
+  .cm-grid .cell b { display: block; font-family: var(--mono); font-size: 1.2rem; }
+  .cm-grid .tp { background: var(--good-soft); color: var(--good); }
+  .cm-grid .tn { background: var(--good-soft); color: var(--good); }
+  .cm-grid .fp { background: var(--bad-soft); color: var(--bad); }
+  .cm-grid .fn { background: var(--bad-soft); color: var(--bad); }
+
+  /* Judge demo */
+  .judge-demo { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-top: 10px; }
+  .answer { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; background: var(--bg); font-size: .92rem; transition: transform .35s ease; }
+  .answer .tag { font-family: var(--display); font-weight: 800; color: var(--accent-ink); }
+  .verdict { margin-top: 12px; padding: 12px 14px; border-radius: 10px; background: var(--judge-soft); color: var(--judge); font-family: var(--display); font-weight: 700; }
+
+  /* Quiz */
+  .quiz { display: grid; gap: 14px; }
+  .q { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .q .qt { font-weight: 700; margin-bottom: 8px; }
+  .q .opts { display: grid; gap: 6px; }
+  .q .opts button { text-align: left; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; cursor: pointer; color: var(--ink); font-size: .93rem; }
+  .q .opts button:hover { border-color: var(--accent); }
+  .q .opts button.right { background: var(--good-soft); border-color: var(--good); }
+  .q .opts button.wrong { background: var(--bad-soft); border-color: var(--bad); }
+  .q .exp { font-size: .9rem; color: var(--ink-2); margin-top: 8px; }
+  .q .exp:empty { display: none; }
+
+  /* Glossary */
+  dl.gloss { display: grid; grid-template-columns: 1fr; gap: 6px 16px; max-width: 80ch; }
+  dl.gloss dt { font-family: var(--display); font-weight: 700; margin-top: 8px; }
+  dl.gloss dd { margin: 0; color: var(--ink-2); font-size: .95rem; }
+  @media (min-width: 700px) { dl.gloss { grid-template-columns: 200px 1fr; } dl.gloss dt { margin-top: 0; } }
+
+  /* Motion */
+  .pulse { animation: pulse 2.4s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { opacity: .55; } 50% { opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    .pulse { animation: none; }
+    .path a, .answer { transition: none; }
+  }
+  .footer { color: var(--ink-3); font-size: .85rem; padding-top: 24px; border-top: 1px solid var(--line); margin-top: 40px; }
+</style>
+<style>
+  /* ---------- Series navigation (shared across all guides) ---------- */
+  .series { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: .82rem; color: var(--ink-3); }
+  .series a { color: var(--accent-ink); text-decoration: none; font-family: var(--display); font-weight: 700; }
+  .series a:hover { text-decoration: underline; }
+  .series .part { font-family: var(--mono); font-size: .72rem; background: var(--accent-soft); color: var(--accent-ink); padding: 2px 8px; border-radius: 999px; }
+  .pager { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 32px; }
+  .pager a { flex: 1 1 220px; text-decoration: none; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .pager a:hover { border-color: var(--accent); }
+  .pager a .dir { font-family: var(--mono); font-size: .7rem; color: var(--ink-3); text-transform: uppercase; letter-spacing: .08em; display: block; }
+  .pager a .t { font-family: var(--display); font-weight: 700; }
+  .pager a.next { text-align: right; }
+  /* Glossary term highlight in prose */
+  .term { border-bottom: 2px dotted var(--accent); cursor: help; }
+  /* Callout list inside cards */
+  .card ul, .card ol { padding-left: 1.1rem; margin: .3rem 0; font-size: .92rem; color: var(--ink-2); }
+  /* Slider fields */
+  .field input[type="range"] { padding: 0; height: 28px; accent-color: var(--accent); }
+  .field .val { font-family: var(--mono); font-size: .85rem; color: var(--accent-ink); }
+  /* Simple flow row diagram (HTML-based, wraps on phones) */
+  .flow { display: flex; align-items: stretch; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
+  .flow .node { flex: 1 1 140px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; min-width: 0; }
+  .flow .node h4 { margin: 0 0 4px; font-size: .95rem; }
+  .flow .node p { font-size: .85rem; color: var(--ink-2); margin: 0; }
+  .flow .node.hot { border-color: var(--accent); background: var(--accent-soft); }
+  .flow .arrow { align-self: center; color: var(--ink-3); font-size: 1.2rem; }
+  /* Chat message mock */
+  .chat { display: grid; gap: 8px; margin: 14px 0; max-width: 70ch; }
+  .msg { border-radius: 12px; padding: 10px 14px; font-size: .93rem; border: 1px solid var(--line); background: var(--surface); }
+  .msg .who { font-family: var(--display); font-weight: 700; font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; display: block; margin-bottom: 2px; }
+  .msg.system { background: var(--surface-2); }
+  .msg.system .who { color: var(--ink-3); }
+  .msg.user { background: var(--accent-soft); border-color: transparent; }
+  .msg.user .who { color: var(--accent-ink); }
+  .msg.assistant { background: var(--good-soft); border-color: transparent; }
+  .msg.assistant .who { color: var(--good); }
+  .msg.tool { background: var(--judge-soft); border-color: transparent; font-family: var(--mono); font-size: .82rem; }
+  .msg.tool .who { color: var(--judge); font-family: var(--display); }
+  .msg.danger { background: var(--bad-soft); border-color: transparent; }
+  .msg.danger .who { color: var(--bad); }
+  /* Bars for probability / comparison demos */
+  .bars { display: grid; gap: 6px; margin-top: 10px; }
+  .bar-row { display: grid; grid-template-columns: 110px 1fr 56px; gap: 8px; align-items: center; font-size: .85rem; }
+  .bar-row .lbl { font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bar-row .track { height: 14px; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
+  .bar-row .fill { height: 100%; background: var(--accent); border-radius: 999px; transition: width .25s ease; }
+  .bar-row .pct { font-family: var(--mono); text-align: right; font-variant-numeric: tabular-nums; }
+  /* Comparison table highlight */
+  td.yes { color: var(--good); font-weight: 700; }
+  td.no { color: var(--bad); font-weight: 700; }
+  td.mid { color: var(--judge); font-weight: 700; }
+<style>
+  /* ---------- Page-specific additions (Tools and Agents) ---------- */
+  .field select { font: inherit; font-size: .95rem; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); width: 100%; }
+  .field select:focus { border-color: var(--accent); }
+  .prow { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-items: end; margin: 8px 0; padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); }
+  .prow .field { margin: 0; }
+  .prow .field.wide { grid-column: 1 / -1; }
+  .chk { display: flex; align-items: center; gap: 8px; font-size: .9rem; font-family: var(--display); font-weight: 700; color: var(--ink-2); padding-bottom: 9px; }
+  .chk input { accent-color: var(--accent); width: 16px; height: 16px; }
+  @media (min-width: 760px) { .prow { grid-template-columns: 1.1fr .9fr 2fr auto; } .prow .field.wide { grid-column: auto; } }
+  .play pre { margin: 6px 0 0; font-size: .8rem; }
+  .play h4 + pre { margin-top: 0; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+</style>
+</head>
+<body>
+<div class="progress" id="progress"></div>
+
+<div class="page">
+  <aside class="toc" aria-label="Chapters">
+    <nav class="toc-inner" id="toc">
+      <a href="#c0"><span class="n">0</span>The limitation</a>
+      <a href="#c1"><span class="n">1</span>Tool use</a>
+      <a href="#c2"><span class="n">2</span>Tool definitions</a>
+      <a href="#c3"><span class="n">3</span>The agent loop</a>
+      <a href="#c4"><span class="n">4</span>Agent patterns</a>
+      <a href="#c5"><span class="n">5</span>Memory</a>
+      <a href="#c6"><span class="n">6</span>MCP</a>
+      <a href="#c7"><span class="n">7</span>Computer use</a>
+      <a href="#c8"><span class="n">8</span>Multi-agent</a>
+      <a href="#c9"><span class="n">9</span>Guardrails</a>
+      <a href="#c10"><span class="n">10</span>Evaluating agents</a>
+      <a href="#c11"><span class="n">11</span>Quiz &amp; glossary</a>
+    </nav>
+  </aside>
+
+  <main>
+    <div class="topbar">
+      <div class="series"><a href="index.html">LLM Study Guides</a><span class="part">Part 4 of 8</span><span>Tools and Agents</span></div>
+      <button class="theme-btn" id="themeBtn" type="button" aria-label="Toggle dark mode">Toggle theme</button>
+    </div>
+
+    <header class="hero">
+      <div class="eyebrow">Part 4 · Tool use and agents, step by step</div>
+      <h1>How does a model go from writing text to actually doing things?</h1>
+      <p class="lead">This guide takes you from a model that can only write text to an agent that looks things up, takes actions, remembers, and stays inside safe limits. By the end you will be able to describe a tool so a model uses it well, draw the agent loop, choose between a workflow and an agent, and list the guardrails every agent needs.</p>
+      <div class="path">
+        <a href="#c0"><span class="step">STEP 0</span><span class="name">The limitation</span></a>
+        <a href="#c1"><span class="step">STEP 1</span><span class="name">Tool use</span></a>
+        <a href="#c2"><span class="step">STEP 2</span><span class="name">Tool definitions</span></a>
+        <a href="#c3"><span class="step">STEP 3</span><span class="name">The agent loop</span></a>
+        <a href="#c4"><span class="step">STEP 4</span><span class="name">Agent patterns</span></a>
+        <a href="#c5"><span class="step">STEP 5</span><span class="name">Memory</span></a>
+        <a href="#c6"><span class="step">STEP 6</span><span class="name">MCP</span></a>
+        <a href="#c7"><span class="step">STEP 7</span><span class="name">Computer use</span></a>
+        <a href="#c8"><span class="step">STEP 8</span><span class="name">Multi-agent</span></a>
+        <a href="#c9"><span class="step">STEP 9</span><span class="name">Guardrails</span></a>
+        <a href="#c10"><span class="step">STEP 10</span><span class="name">Evaluating agents</span></a>
+        <a href="#c11"><span class="step">STEP 11</span><span class="name">Quiz &amp; glossary</span></a>
+      </div>
+    </header>
+
+  <!-- ===================== CHAPTER 0 ===================== -->
+  <section class="chapter" id="c0">
+    <div class="chapter-head">
+      <div class="eyebrow">Step 0 · The limitation</div>
+      <h2>A model can only write text</h2>
+      <p class="goal">Tools only make sense once you feel the problem they solve. This chapter is that problem.</p>
+    </div>
+
+    <p>In Part 1 you learned that a <strong>large language model (LLM)</strong> reads text and predicts the next piece of text, one <strong>token</strong> (a word or part of a word) at a time. That is the whole trick. It is a very good trick, but notice what is missing: the model has no hands. It cannot look up today's weather. It cannot open your order database. It cannot send an email, book a flight, or run a calculation on a real computer. It can only produce more text.</p>
+
+    <p>Ask a bare model "what is the weather in Lisbon right now?" and the honest answer is "I cannot know". Some models will say that. Others will produce a confident, fluent, made-up number, because producing fluent text is what they were trained to do. Neither answer helps you.</p>
+
+    <div class="box analogy">
+      <span class="label">Analogy</span>
+      <p>Picture a brilliant manager locked in an office with nothing but a phone. She cannot leave the room. She cannot see the warehouse, the bank balance, or the customer queue. But she can pick up the phone, ask an assistant "how many blue jackets are left in stock?", and hear the answer. Then she can decide what to do next and make another call. The manager is the model. The phone calls are <strong>tools</strong>. The assistants are your code.</p>
+    </div>
+
+    <div class="cards">
+      <div class="card"><h4><span class="chip good">Can</span>Write, rewrite, summarise</h4><p>Anything that is text in and text out: drafting an email, explaining a concept, translating, classifying a message.</p></div>
+      <div class="card"><h4><span class="chip good">Can</span>Decide and plan</h4><p>Given the facts, it can reason about what should happen next and describe the steps in words.</p></div>
+      <div class="card"><h4><span class="chip bad">Cannot</span>Know fresh facts</h4><p>Anything that happened after training or that lives only in your systems: prices, stock, your calendar, a customer's order.</p></div>
+      <div class="card"><h4><span class="chip bad">Cannot</span>Act on the world</h4><p>It cannot send, save, book, delete, or pay. On its own, nothing it writes has any effect outside the chat.</p></div>
+    </div>
+
+    <div class="box key">
+      <span class="label">Key idea</span>
+      <p>A <strong>tool</strong> is a function your application offers to the model: "if you need the weather, ask me for it and I will fetch it for you". The model asks in text; your code does the real work; the result comes back as text. Tools are how a text-only model gets to <em>act</em>. The rest of this guide is about that one loop and everything built on top of it.</p>
+    </div>
+
+    <div class="box doubt">
+      <span class="label">Common doubt</span>
+      <p><strong>"But the chat app I use does search the web. So the model can act?"</strong> The app around the model can. Somebody wrote a search tool, described it to the model, and runs the search when the model asks. The model itself is still doing nothing but reading and writing text. Keep that picture in your head; it will make every later topic simpler.</p>
+    </div>
+  </section>
+
+  <!-- ===================== CHAPTER 1 ===================== -->
+  <section class="chapter" id="c1">
+    <div class="chapter-head">
+      <div class="eyebrow">Step 1 · One tool call</div>
+      <h2>Tool use, step by step</h2>
+      <p class="goal">Five steps, always the same. Watch one weather question travel through them, then see the same thing as a chat.</p>
+    </div>
+
+    <p><strong>Tool use</strong> (older name: <strong>function calling</strong>) is a small protocol between your application and the model. It has five steps, and every tool call in every product follows them.</p>
+
+    <ol>
+      <li><strong>Describe the tools.</strong> Along with the user's message, your app sends the model a list of tools it may ask for: each one has a name, a plain description of what it does, and the <strong>parameters</strong> it needs (the inputs, such as a city name).</li>
+      <li><strong>The model asks for a call.</strong> Instead of answering the user, the model replies with a structured request: "call <code>get_weather</code> with <code>city = Lisbon</code>". This is still text, just in a fixed format your code can read.</li>
+      <li><strong>Your code runs the real function.</strong> Your app reads that request, checks it, and runs the actual <code>get_weather</code> function, which talks to a real weather service.</li>
+      <li><strong>Your code sends the result back.</strong> The function's output goes back to the model as a new message: "tool result: 18 degrees, sunny".</li>
+      <li><strong>The model writes the final answer.</strong> Now it has the fact, so it can reply to the user in normal language.</li>
+    </ol>
+
+    <div class="diagram">
+      <svg viewBox="0 0 960 420" role="img" aria-label="Sequence of a tool call between the model, your app, and a real function">
+        <defs>
+          <marker id="arrA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--ink-3)"></path></marker>
+        </defs>
+        <g font-family="var(--display)" font-weight="700" font-size="14">
+          <rect x="70" y="16" width="140" height="44" rx="12" fill="var(--accent)"></rect>
+          <text x="140" y="44" text-anchor="middle" fill="#fff">Model</text>
+          <rect x="400" y="16" width="160" height="44" rx="12" class="svg-box"></rect>
+          <text x="480" y="44" text-anchor="middle" fill="var(--ink)">Your app (code)</text>
+          <rect x="740" y="16" width="160" height="44" rx="12" fill="var(--judge-soft)" stroke="var(--judge)"></rect>
+          <text x="820" y="44" text-anchor="middle" fill="var(--judge)">Real function</text>
+        </g>
+        <g stroke="var(--line)" stroke-width="2" stroke-dasharray="4 4" fill="none">
+          <path d="M140 60 V380"></path><path d="M480 60 V380"></path><path d="M820 60 V380"></path>
+        </g>
+        <g class="svg-line" stroke-width="2">
+          <path d="M478 100 H146" marker-end="url(#arrA)"></path>
+          <path d="M146 150 H478" marker-end="url(#arrA)"></path>
+          <path d="M482 200 H814" marker-end="url(#arrA)"></path>
+          <path d="M818 250 H486" marker-end="url(#arrA)"></path>
+          <path d="M478 300 H146" marker-end="url(#arrA)"></path>
+          <path d="M146 350 H478" marker-end="url(#arrA)"></path>
+        </g>
+        <g font-family="var(--mono)" font-size="12" fill="var(--ink-2)" text-anchor="middle">
+          <text x="312" y="92">1  tool list + "Weather in Lisbon?"</text>
+          <text x="312" y="142">2  call get_weather(city="Lisbon")</text>
+          <text x="650" y="192">3  your code runs get_weather("Lisbon")</text>
+          <text x="650" y="242">returns {temp: 18, sky: "sunny"}</text>
+          <text x="312" y="292">4  tool result: {temp: 18, sky: "sunny"}</text>
+          <text x="312" y="342">5  "It is 18 degrees and sunny in Lisbon."</text>
+        </g>
+        <circle r="8" fill="var(--bad)" stroke="var(--surface)" stroke-width="3">
+          <animateMotion dur="9s" repeatCount="indefinite" path="M480 100 H140 V150 H480 V200 H820 V250 H480 V300 H140 V350 H480" calcMode="linear"></animateMotion>
+        </circle>
+        <text x="20" y="405" class="svg-sub">Time flows downward. The model only ever sends and receives text. Step 3 is the only place where something real happens.</text>
+      </svg>
+      <p class="cap">One tool call as a sequence. The red dot is the conversation moving between the three parties. Notice that the model never touches the real function directly.</p>
+    </div>
+
+    <h3>The same thing as a chat</h3>
+    <p>Most tool-using systems store this exchange as a list of messages. Here is the weather example in that form. The orange messages are the tool call and the tool result; the user never sees them.</p>
+
+    <div class="chat">
+      <div class="msg system"><span class="who">System (from your app)</span>You are a helpful assistant. Tools available: <code>get_weather(city)</code>: returns the current weather for a city.</div>
+      <div class="msg user"><span class="who">User</span>What is the weather in Lisbon right now?</div>
+      <div class="msg tool"><span class="who">Model → tool call</span>get_weather(city="Lisbon")</div>
+      <div class="msg tool"><span class="who">Your app → tool result</span>{"temp_c": 18, "sky": "sunny"}</div>
+      <div class="msg assistant"><span class="who">Model</span>It is 18 degrees and sunny in Lisbon right now.</div>
+    </div>
+
+    <div class="box key">
+      <span class="label">Key idea</span>
+      <p>The model never runs anything. It writes a <em>request</em>. Your code decides whether to honour it, runs the function, and reports back. This is good news for safety: every real action passes through code you control, where you can check it, log it, or refuse it.</p>
+    </div>
+
+    <div class="box doubt">
+      <span class="label">Common doubt</span>
+      <p><strong>"How does the model know it should call the tool instead of just answering?"</strong> Two things. First, the tool descriptions are placed into the model's input, so it can see what is on offer. Second, models sold for tool use have been trained on many examples where the right move was to emit a tool request. So when the question needs fresh data and a matching tool exists, "ask for the tool" is simply the most likely next text. It is still prediction, which is also why it sometimes picks the wrong tool.</p>
+    </div>
+
+    <details class="deeper">
+      <summary>Go deeper: what the structured request actually looks like</summary>
+      <p>Tool requests and results are usually written in <strong>JSON</strong>, a simple text format for structured data: names and values inside curly braces, like <code>{"city": "Lisbon"}</code>. JSON is easy for code to read, which is the point. A raw tool request from a model looks roughly like this:</p>
+      <pre><code>{<span class="st">"type"</span>: <span class="st">"tool_call"</span>, <span class="st">"name"</span>: <span class="st">"get_weather"</span>, <span class="st">"input"</span>: {<span class="st">"city"</span>: <span class="st">"Lisbon"</span>}}</code></pre>
+      <p>Your code reads the name, looks up the matching function, passes the input, and sends back another JSON message tagged as a tool result. Providers differ in the exact field names, but the shape is always the same: a name and a bag of arguments.</p>
+    </details>
+  </section>
+
+  <!-- ===================== CHAPTER 2 ===================== -->
+  <section class="chapter" id="c2">
+    <div class="chapter-head">
+      <div class="eyebrow">Step 2 · Describing tools</div>
+      <h2>Writing tool definitions that work</h2>
+      <p class="goal">The model chooses tools by reading your descriptions. Good descriptions are most of the difference between a tool that gets used well and one that gets ignored or misused.</p>
+    </div>
+
+    <p>A <strong>tool definition</strong> is the text the model sees about one tool. It has three parts: a <strong>name</strong>, a <strong>description</strong>, and a <strong>schema</strong> for the parameters. A schema is a formal list of the inputs: each parameter's name, its type (text, number, yes/no), what it means, and whether it is required. The model never sees your code. It sees only this definition, so the definition has to carry all the meaning.</p>
+
+    <div class="box analogy">
+      <span class="label">Analogy</span>
+      <p>Think of the definition as the label on a drawer in a shared kitchen. "Stuff" is a useless label. "Baking: flour, sugar, yeast. Not spices, those are in the next drawer" is a great label. A new cook (the model) who has never seen the kitchen can find what they need on the first try, and knows what <em>not</em> to look for there.</p>
+    </div>
+
+    <h3>Rules of thumb for good definitions</h3>
+    <div class="cards">
+      <div class="card"><h4>Clear, specific names</h4><p>A verb plus a noun in lowercase with underscores: <code>get_order_status</code>, <code>send_refund_email</code>. Not <code>tool1</code>, not <code>process</code>.</p></div>
+      <div class="card"><h4>Say when to use it, and when not to</h4><p>"Look up one order by its number. Use when the user asks where an order is. Do not use for returns; use <code>start_return</code> instead."</p></div>
+      <div class="card"><h4>Few parameters</h4><p>Two or three is comfortable. Ten is a puzzle. If a tool needs many inputs, it is probably two tools.</p></div>
+      <div class="card"><h4>Describe every parameter</h4><p>Include the format and an example: "order number, digits only, e.g. 48213". Models copy the example format.</p></div>
+      <div class="card"><h4>Return helpful results</h4><p>Short, structured, and complete. If nothing was found, say so plainly: <code>{"found": false}</code>, not an empty string.</p></div>
+      <div class="card"><h4>Return helpful errors</h4><p>"Order 48213 not found. Order numbers have 5 digits." tells the model how to recover. A stack trace does not.</p></div>
+    </div>
+
+    <div class="play">
+      <span class="label">Playground 1</span>
+      <h4>Tool definition builder</h4>
+      <p style="font-size:.93rem;color:var(--ink-2)">Describe a tool the way an app describes it to a model. The page shows the schema the model would see, a call the model would probably produce for the test request, and a quick quality check. Edit anything and watch the output change.</p>
+      <div class="field"><label for="tName">Tool name</label><input id="tName" value="get_order_status"></div>
+      <div class="field"><label for="tDesc">Description (what it does, when to use it, when not to)</label><textarea id="tDesc" rows="3">Look up the current status and delivery estimate of one customer order by its order number. Use when the user asks where an order is or when it will arrive. Do not use for returns or refunds.</textarea></div>
+      <div id="tParams">
+        <div class="prow">
+          <div class="field"><label>Parameter name</label><input class="pName" value="order_number"></div>
+          <div class="field"><label>Type</label><select class="pType"><option value="string" selected>string (text)</option><option value="number">number</option><option value="boolean">boolean (yes/no)</option></select></div>
+          <div class="field wide"><label>Description</label><input class="pDesc" value="The order number, digits only, e.g. 48213"></div>
+          <label class="chk"><input type="checkbox" class="pReq" checked> required</label>
+        </div>
+        <div class="prow">
+          <div class="field"><label>Parameter name</label><input class="pName" value="include_items"></div>
+          <div class="field"><label>Type</label><select class="pType"><option value="string">string (text)</option><option value="number">number</option><option value="boolean" selected>boolean (yes/no)</option></select></div>
+          <div class="field wide"><label>Description</label><input class="pDesc" value="Also list the items in the order. Default false."></div>
+          <label class="chk"><input type="checkbox" class="pReq"> required</label>
+        </div>
+        <div class="prow">
+          <div class="field"><label>Parameter name (optional)</label><input class="pName" value="" placeholder="e.g. customer_email"></div>
+          <div class="field"><label>Type</label><select class="pType"><option value="string" selected>string (text)</option><option value="number">number</option><option value="boolean">boolean (yes/no)</option></select></div>
+          <div class="field wide"><label>Description</label><input class="pDesc" value="" placeholder="leave empty to skip"></div>
+          <label class="chk"><input type="checkbox" class="pReq"> required</label>
+        </div>
+      </div>
+      <div class="field"><label for="tReq">User request to test with</label><input id="tReq" value="Hi, where is my order 48213? I ordered it last Tuesday."></div>
+      <div class="results" id="tChecks"></div>
+      <h4>What the model sees (the definition, as JSON)</h4>
+      <pre id="tSchema"></pre>
+      <h4>A call the model might produce for that request</h4>
+      <pre id="tCall"></pre>
+      <p style="font-size:.85rem;color:var(--ink-3);margin-top:10px">The sample call is guessed by simple rules on this page (numbers, emails, words that match parameter names). A real model reads the whole request and the description, so a vague description here would show up as wrong or missing arguments there.</p>
+    </div>
+
+    <h3>Before and after</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>Weak definition</th><th>Strong definition</th><th>Why it matters</th></tr></thead>
+      <tbody>
+        <tr><td><code>lookup(q)</code>: "looks things up"</td><td><code>get_order_status(order_number)</code>: "Returns status and delivery date for one order."</td><td>The model cannot tell what <code>q</code> should contain, so it guesses.</td></tr>
+        <tr><td>"Search the knowledge base."</td><td>"Search help articles. Use for how-to questions. Do not use for questions about a specific order."</td><td>Without the "do not", the model searches for everything, including things another tool handles.</td></tr>
+        <tr><td>Parameter <code>date</code>: "the date"</td><td><code>date</code>: "ISO format YYYY-MM-DD, e.g. 2030-05-14"</td><td>Format hints stop the model from sending "next Tuesday" to a function that wants a date.</td></tr>
+        <tr><td>Error: <code>Exception at line 42</code></td><td>Error: "No order with number 4821. Ask the user to check the number."</td><td>The model can only recover from errors it can understand.</td></tr>
+      </tbody>
+    </table></div>
+
+    <div class="box key">
+      <span class="label">Key idea</span>
+      <p>Write tool definitions for a smart new colleague who has never seen your system. Name, purpose, when to use, when not to, exact input format, and what comes back. If a human would be confused by the description, so will the model.</p>
+    </div>
+
+    <div class="box doubt">
+      <span class="label">Common doubt</span>
+      <p><strong>"How many tools can I give the model at once?"</strong> There is no hard limit, but as a rule of thumb, beyond a couple of dozen the model starts confusing similar ones, and every definition costs tokens on every request. If you have many, group them behind a few broader tools, or use routing (Step 4) so that each request only sees the tools it needs.</p>
+    </div>
+
+    <div class="box tip">
+      <span class="label">Practical tip</span>
+      <p>Test tool definitions the way you test prompts (Part 2): collect 20 realistic requests, run them, and check which tool was picked and with which arguments. Most problems turn out to be a vague sentence in a description, not a model limitation.</p>
+    </div>
+  </section>
+
+  <!-- ===================== CHAPTER 3 ===================== -->
+  <section class="chapter" id="c3">
+    <div class="chapter-head">
+      <div class="eyebrow">Step 3 · The loop</div>
+      <h2>From one call to an agent</h2>
+      <p class="goal">Put the tool call inside a loop and let the model decide when to stop. That is an agent. Then the most important design decision: do you need one?</p>
+    </div>
+
+    <p>One tool call answers one question. Real tasks need several: "find the cheapest of these three flights and book it" needs three price lookups, a comparison, and a booking. An <strong>agent</strong> is a model running in a loop: it looks at the task, chooses an <strong>action</strong> (a tool call), your code runs it, the model reads the <strong>observation</strong> (the result), and it chooses the next action. It keeps going until it decides the task is done and writes the answer. That loop is called the <strong>agent loop</strong>.</p>
+
+    <div class="diagram narrow">
+      <svg viewBox="0 0 600 400" role="img" aria-label="The agent loop: think, act, observe, check if done, repeat">
+        <text x="330" y="38" text-anchor="middle" class="svg-sub">task comes in</text>
+        <path d="M330 44 V62" class="svg-line" stroke-width="2"></path>
+        <path d="M330 85 A115 115 0 0 1 445 200 A115 115 0 0 1 330 315 A115 115 0 0 1 215 200 A115 115 0 0 1 330 85" fill="none" stroke="var(--line)" stroke-width="4"></path>
+        <g font-family="var(--display)" font-weight="700" font-size="14">
+          <rect x="275" y="65" width="110" height="40" rx="10" fill="var(--accent)"></rect>
+          <text x="330" y="90" text-anchor="middle" fill="#fff">1 Think</text>
+          <rect x="390" y="180" width="110" height="40" rx="10" fill="var(--judge-soft)" stroke="var(--judge)"></rect>
+          <text x="445" y="205" text-anchor="middle" fill="var(--judge)">2 Act</text>
+          <rect x="275" y="295" width="110" height="40" rx="10" class="svg-box"></rect>
+          <text x="330" y="320" text-anchor="middle" fill="var(--ink)">3 Observe</text>
+          <rect x="160" y="180" width="110" height="40" rx="10" fill="var(--good-soft)" stroke="var(--good)"></rect>
+          <text x="215" y="205" text-anchor="middle" fill="var(--good)">4 Done?</text>
+          <rect x="20" y="180" width="100" height="40" rx="10" fill="var(--good)"></rect>
+          <text x="70" y="205" text-anchor="middle" fill="#fff">Answer</text>
+        </g>
+        <path d="M158 200 H124" class="svg-line" stroke-width="2"></path>
+        <path d="M132 200 L124 196 V204 z" fill="var(--ink-3)"></path>
+        <g font-family="var(--mono)" font-size="12" fill="var(--ink-2)">
+          <text x="393" y="90">what should I do next?</text>
+          <text x="508" y="205">call one tool</text>
+          <text x="330" y="362" text-anchor="middle">read the result</text>
+          <text x="141" y="171" text-anchor="middle">yes</text>
+          <text x="120" y="118">no: go round again</text>
+        </g>
+        <circle r="8" fill="var(--bad)" stroke="var(--surface)" stroke-width="3">
+          <animateMotion dur="7s" repeatCount="indefinite" path="M330 85 A115 115 0 0 1 445 200 A115 115 0 0 1 330 315 A115 115 0 0 1 215 200 A115 115 0 0 1 330 85" keyPoints="0;0.25;0.25;0.5;0.5;0.75;0.75;1;1" keyTimes="0;0.2;0.25;0.45;0.5;0.7;0.75;0.95;1" calcMode="linear"></animateMotion>
+        </circle>
+      </svg>
+      <p class="cap">The agent loop. In practice "think" and "act" happen in one model reply: the model reasons briefly and ends with a tool request. "Observe" is your code feeding the result back. The loop exits when the model answers instead of asking for a tool.</p>
+    </div>
+
+    <div class="box analogy">
+      <span class="label">Analogy</span>
+      <p>A recipe says "chop the onions, then fry them for five minutes, then add the tomatoes". Whoever wrote the recipe decided the steps; the cook just follows. That is a <strong>workflow</strong>. An experienced cook asked to "make something nice from what is in the fridge" opens the fridge, looks, tastes, adjusts, and decides each step as they go. That is an <strong>agent</strong>. The second cook is more flexible and more likely to surprise you, in both directions.</p>
+    </div>
+
+    <h3>Workflow or agent?</h3>
+    <p>This is the single most useful distinction in the whole topic. In a <strong>workflow</strong>, the developer fixes the sequence of steps in code, and the model fills in one step at a time (classify this, then write that). In an <strong>agent</strong>, the model itself decides which steps to take and how many, at run time.</p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 960 280" role="img" aria-label="Workflow with fixed steps versus agent that chooses steps">
+        <defs>
+          <marker id="arrC" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--ink-3)"></path></marker>
+        </defs>
+        <text x="20" y="34" class="svg-text" font-size="14">Workflow: the developer fixes the steps</text>
+        <text x="500" y="34" class="svg-text" font-size="14">Agent: the model decides the steps at run time</text>
+        <path d="M480 20 V265" stroke="var(--line)" stroke-width="2" stroke-dasharray="6 6" fill="none"></path>
+        <g font-family="var(--display)" font-weight="700" font-size="12">
+          <rect x="20" y="90" width="80" height="44" rx="10" class="svg-box"></rect>
+          <text x="60" y="117" text-anchor="middle" fill="var(--ink)">Request</text>
+          <rect x="125" y="90" width="95" height="44" rx="10" fill="var(--accent)"></rect>
+          <text x="172" y="117" text-anchor="middle" fill="#fff">LLM: classify</text>
+          <rect x="245" y="90" width="95" height="44" rx="10" fill="var(--judge-soft)" stroke="var(--judge)"></rect>
+          <text x="292" y="117" text-anchor="middle" fill="var(--judge)">Code: look up</text>
+          <rect x="365" y="90" width="95" height="44" rx="10" fill="var(--accent)"></rect>
+          <text x="412" y="117" text-anchor="middle" fill="#fff">LLM: reply</text>
+          <rect x="500" y="90" width="80" height="44" rx="10" class="svg-box"></rect>
+          <text x="540" y="117" text-anchor="middle" fill="var(--ink)">Request</text>
+          <rect x="620" y="90" width="130" height="44" rx="10" fill="var(--accent)"></rect>
+          <text x="685" y="117" text-anchor="middle" fill="#fff">LLM decides</text>
+          <rect x="850" y="90" width="90" height="44" rx="10" fill="var(--good-soft)" stroke="var(--good)"></rect>
+          <text x="895" y="117" text-anchor="middle" fill="var(--good)">Answer</text>
+          <rect x="560" y="190" width="90" height="40" rx="10" fill="var(--judge-soft)" stroke="var(--judge)"></rect>
+          <text x="605" y="215" text-anchor="middle" fill="var(--judge)">search</text>
+          <rect x="670" y="190" width="90" height="40" rx="10" fill="var(--judge-soft)" stroke="var(--judge)"></rect>
+          <text x="715" y="215" text-anchor="middle" fill="var(--judge)">database</text>
+          <rect x="780" y="190" width="90" height="40" rx="10" fill="var(--judge-soft)" stroke="var(--judge)"></rect>
+          <text x="825" y="215" text-anchor="middle" fill="var(--judge)">send email</text>
+        </g>
+        <g class="svg-line" stroke-width="2">
+          <path d="M100 112 H123" marker-end="url(#arrC)"></path>
+          <path d="M220 112 H243" marker-end="url(#arrC)"></path>
+          <path d="M340 112 H363" marker-end="url(#arrC)"></path>
+          <path d="M580 112 H618" marker-end="url(#arrC)"></path>
+          <path d="M750 112 H848" marker-end="url(#arrC)"></path>
+          <path d="M660 134 L610 188" marker-start="url(#arrC)" marker-end="url(#arrC)"></path>
+          <path d="M690 134 L712 188" marker-start="url(#arrC)" marker-end="url(#arrC)"></path>
+          <path d="M720 134 L815 188" marker-start="url(#arrC)" marker-end="url(#arrC)"></path>
+        </g>
+        <text x="799" y="82" text-anchor="middle" class="svg-sub">when done</text>
+        <text x="20" y="170" class="svg-sub">Same three steps every time. Predictable, cheap, easy to test.</text>
+        <text x="20" y="188" class="svg-sub">Code decides the path; the model only fills in the boxes.</text>
+        <text x="500" y="252" class="svg-sub">Picks a tool, reads the result, picks again.</text>
+        <text x="500" y="268" class="svg-sub">Flexible, but each run may take a different path.</text>
+      </svg>
+      <p class="cap">Left: a support workflow where the code always classifies, looks up, then replies. Right: an agent where the model chooses among tools until it decides it can answer.</p>
+    </div>
+
+    <div class="tbl"><table>
+      <thead><tr><th></th><th>Workflow</th><th>Agent</th></tr></thead>
+      <tbody>
+        <tr><td>Who decides the steps</td><td>The developer, in code</td><td>The model, at run time</td></tr>
+        <tr><td>Predictability</td><td class="yes">High: same path every time</td><td class="mid">Lower: path can differ per run</td></tr>
+        <tr><td>Handles surprises</td><td class="no">Only the cases you coded</td><td class="yes">Can adapt to new situations</td></tr>
+        <tr><td>Cost and speed</td><td class="yes">Known in advance</td><td class="mid">Varies; can run away</td></tr>
+        <tr><td>Testing (Part 5)</td><td class="yes">Test each step</td><td class="mid">Test whole runs and final results</td></tr>
+        <tr><td>Good for</td><td>Well-understood, repeated tasks</td><td>Open-ended tasks with many possible paths</td></tr>
+      </tbody>
+    </table></div>
+
+    <div class="box key">
+      <span class="label">Key idea</span>
+      <p><strong>Use the simplest thing that works.</strong> A single well-written prompt beats a workflow if it does the job. A workflow beats an agent if the steps are known in advance. Reach for an agent only when the path genuinely cannot be fixed ahead of time. Every step up adds cost, latency (waiting time), and ways to fail.</p>
+    </div>
+
+    <div class="box doubt">
+      <span class="label">Common doubt</span>
+      <p><strong>"Is a chatbot with one search tool an agent?"</strong> Borderline, and the word is used loosely. If the model can call search, read the result, decide to search again with a better query, and only then answer, it is running the loop, so yes, a small one. If your code always searches exactly once before asking the model, it is a workflow. The label matters less than knowing who is deciding the steps.</p>
+    </div>
+  </section>
+
+  <!-- ===================== CHAPTER 4 ===================== -->
+  <section class="chapter" id="c4">
+    <div class="chapter-head">
+      <div class="eyebrow">Step 4 · Patterns</div>
+      <h2>Common agent patterns</h2>
+      <p class="goal">Most real systems are built from six recurring shapes. Learn to recognise them and you can read almost any architecture diagram.</p>
+    </div>
+
+    <h3>Prompt chaining</h3>
+    <p>The simplest pattern: break a task into fixed steps, and feed each model output into the next prompt. Often a small code check sits between steps ("did step 1 produce a valid outline? if not, stop"). It is a workflow, not an agent, and that is its strength.</p>
+    <div class="flow">
+      <div class="node"><h4>1. Outline</h4><p>LLM writes a bullet outline for the article.</p></div>
+      <div class="arrow">→</div>
+      <div class="node"><h4>Check</h4><p>Code: at least 3 bullets? If not, retry.</p></div>
+      <div class="arrow">→</div>
+      <div class="node"><h4>2. Draft</h4><p>LLM expands the outline into full text.</p></div>
+      <div class="arrow">→</div>
+      <div class="node"><h4>3. Polish</h4><p>LLM fixes tone and length.</p></div>
+    </div>
+
+    <h3>Routing, parallelization, orchestrator-workers, evaluator-optimizer</h3>
+    <div class="diagram">
+      <svg viewBox="0 0 960 500" role="img" aria-label="Four agent patterns: routing, parallelization, orchestrator-workers, evaluator-optimizer">
+        <defs>
+          <marker id="arrD" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--ink-3)"></path></marker>
+        </defs>
+        <path d="M480 20 V480" stroke="var(--line)" stroke-width="2" stroke-dasharray="6 6" fill="none"></path>
+        <path d="M20 250 H940" stroke="var(--line)" stroke-width="2" stroke-dasharray="6 6" fill="none"></path>
+        <text x="20" y="34" class="svg-text" font-size="14">Routing</text>
+        <text x="500" y="34" class="svg-text" font-size="14">Parallelization</text>
+        <text x="20" y="284" class="svg-text" font-size="14">Orchestrator and workers</text>
+        <text x="500" y="284" class="svg-text" font-size="14">Evaluator and optimizer</text>
+
+        <g font-family="var(--display)" font-weight="700" font-size="12">
+          <!-- routing -->
+          <rect x="20" y="110" width="80" height="40" rx="10" class="svg-box"></rect>
+          <text x="60" y="135" text-anchor="middle" fill="var(--ink)">Request</text>
+          <rect x="135" y="110" width="90" height="40" rx="10" fill="var(--accent)"></rect>
+          <text x="180" y="135" text-anchor="middle" fill="#fff">Router</text>
+          <rect x="290" y="50" width="160" height="36" rx="10" class="svg-box"></rect>
+          <text x="370" y="73" text-anchor="middle" fill="var(--ink)">Billing specialist</text>
+          <rect x="290" y="112" width="160" height="36" rx="10" fill="var(--accent-soft)" stroke="var(--accent)"></rect>
+          <text x="370" y="135" text-anchor="middle" fill="var(--accent-ink)">Tech specialist</text>
+          <rect x="290" y="174" width="160" height="36" rx="10" class="svg-box"></rect>
+          <text x="370" y="197" text-anchor="middle" fill="var(--ink)">Refunds specialist</text>
+          <!-- parallel -->
+          <rect x="500" y="110" width="80" height="40" rx="10" class="svg-box"></rect>
+          <text x="540" y="135" text-anchor="middle" fill="var(--ink)">Request</text>
+          <rect x="630" y="50" width="100" height="36" rx="10" fill="var(--accent-soft)" stroke="var(--accent)"></rect>
+          <text x="680" y="73" text-anchor="middle" fill="var(--accent-ink)">Call A</text>
+          <rect x="630" y="112" width="100" height="36" rx="10" fill="var(--accent-soft)" stroke="var(--accent)"></rect>
+          <text x="680" y="135" text-anchor="middle" fill="var(--accent-ink)">Call B</text>
+          <rect x="630" y="174" width="100" height="36" rx="10" fill="var(--accent-soft)" stroke="var(--accent)"></rect>
+          <text x="680" y="197" text-anchor="middle" fill="var(--accent-ink)">Call C</text>
+          <rect x="790" y="110" width="120" height="40" rx="10" fill="var(--good-soft)" stroke="var(--good)"></rect>
+          <text x="850" y="135" text-anchor="middle" fill="var(--good)">Merge or vote</text>
+          <!-- orchestrator -->
+          <rect x="20" y="360" width="80" height="40" rx="10" class="svg-box"></rect>
+          <text x="60" y="385" text-anchor="middle" fill="var(--ink)">Task</text>
+          <rect x="135" y="360" width="120" height="40" rx="10" fill="var(--accent)"></rect>
+          <text x="195" y="385" text-anchor="middle" fill="#fff">Orchestrator</text>
+          <rect x="320" y="300" width="130" height="36" rx="10" fill="var(--judge-soft)" stroke="var(--judge)"></rect>
+          <text x="385" y="323" text-anchor="middle" fill="var(--judge)">Worker: research</text>
+          <rect x="320" y="362" width="130" height="36" rx="10" fill="var(--judge-soft)" stroke="var(--judge)"></rect>
+          <text x="385" y="385" text-anchor="middle" fill="var(--judge)">Worker: draft</text>
+          <rect x="320" y="424" width="130" height="36" rx="10" fill="var(--judge-soft)" stroke="var(--judge)"></rect>
+          <text x="385" y="447" text-anchor="middle" fill="var(--judge)">Worker: check</text>
+          <!-- evaluator -->
+          <rect x="500" y="360" width="80" height="40" rx="10" class="svg-box"></rect>
+          <text x="540" y="385" text-anchor="middle" fill="var(--ink)">Task</text>
+          <rect x="620" y="360" width="110" height="40" rx="10" fill="var(--accent)"></rect>
+          <text x="675" y="385" text-anchor="middle" fill="#fff">Generator</text>
+          <rect x="790" y="360" width="110" height="40" rx="10" fill="var(--judge-soft)" stroke="var(--judge)"></rect>
+          <text x="845" y="385" text-anchor="middle" fill="var(--judge)">Evaluator</text>
+        </g>
+        <g class="svg-line" stroke-width="2">
+          <path d="M100 130 H133" marker-end="url(#arrD)"></path>
+          <path d="M225 130 L288 70" marker-end="url(#arrD)" stroke-dasharray="4 4"></path>
+          <path d="M225 130 H288" marker-end="url(#arrD)"></path>
+          <path d="M225 130 L288 190" marker-end="url(#arrD)" stroke-dasharray="4 4"></path>
+          <path d="M580 130 L628 70" marker-end="url(#arrD)"></path>
+          <path d="M580 130 H628" marker-end="url(#arrD)"></path>
+          <path d="M580 130 L628 190" marker-end="url(#arrD)"></path>
+          <path d="M730 70 L788 128" marker-end="url(#arrD)"></path>
+          <path d="M730 130 H788" marker-end="url(#arrD)"></path>
+          <path d="M730 190 L788 132" marker-end="url(#arrD)"></path>
+          <path d="M100 380 H133" marker-end="url(#arrD)"></path>
+          <path d="M255 380 L318 320" marker-start="url(#arrD)" marker-end="url(#arrD)"></path>
+          <path d="M255 380 H318" marker-start="url(#arrD)" marker-end="url(#arrD)"></path>
+          <path d="M255 380 L318 440" marker-start="url(#arrD)" marker-end="url(#arrD)"></path>
+          <path d="M580 380 H618" marker-end="url(#arrD)"></path>
+          <path d="M730 380 H788" marker-end="url(#arrD)"></path>
+          <path d="M845 358 C845 305 675 305 675 358" marker-end="url(#arrD)"></path>
+          <path d="M845 400 V440" marker-end="url(#arrD)"></path>
+        </g>
+        <g class="svg-sub">
+          <text x="20" y="236">The router picks one specialist; only that prompt runs (solid arrow).</text>
+          <text x="500" y="236">All three calls run at the same time; the results are combined.</text>
+          <text x="20" y="486">The orchestrator splits the task, delegates, and combines the results.</text>
+          <text x="760" y="304" text-anchor="middle">not good enough: feedback, try again</text>
+          <text x="845" y="460" text-anchor="middle">good enough: done</text>
+          <text x="500" y="486">One call drafts, another critiques, until the critic is happy.</text>
+        </g>
+      </svg>
+      <p class="cap">Four shapes you will see again and again. Routing and parallelization are usually workflows; orchestrator-workers and evaluator-optimizer are usually agents, because the model decides how many workers or rounds are needed.</p>
+    </div>
+
+    <div class="cards">
+      <div class="card"><h4>Routing</h4><p>A first call classifies the request, then code sends it to a specialist prompt with only the tools that specialist needs. A <strong>router</strong> keeps each prompt small and focused.</p><p class="ex">support bot: billing / tech / refunds</p></div>
+      <div class="card"><h4>Parallelization</h4><p>Run several model calls at the same time and merge. Either split the work (each call takes one section) or vote (ask the same question three times and keep the majority).</p><p class="ex">check a document against five rules at once</p></div>
+      <div class="card"><h4>Orchestrator-workers</h4><p>An <strong>orchestrator</strong> model reads the task, breaks it into pieces it could not know in advance, hands each to a <strong>worker</strong>, then combines the results.</p><p class="ex">"update every file that uses this function"</p></div>
+      <div class="card"><h4>Evaluator-optimizer</h4><p>One call produces a draft, a second call critiques it against clear criteria, and the draft is revised. Loop until the critic is satisfied or you hit a round limit.</p><p class="ex">translation that must keep a formal tone</p></div>
+      <div class="card"><h4>Prompt chaining</h4><p>Fixed steps in sequence, each one simpler than the whole task, with cheap code checks between them.</p><p class="ex">outline, then draft, then polish</p></div>
+      <div class="card"><h4>Tool-using agent loop</h4><p>The general case from Step 3: one model, a set of tools, and a loop that runs until the model answers.</p><p class="ex">"find and book the cheapest flight"</p></div>
+    </div>
+
+    <div class="box analogy">
+      <span class="label">Analogy</span>
+      <p>A restaurant kitchen uses all of these. The person at the pass reads each order and sends it to the grill, the salad station, or the pastry station (routing). Three cooks prepare the three courses at once (parallelization). The head chef plans a banquet menu and hands dishes to sous-chefs (orchestrator-workers). A dish goes out only after the chef tastes it and sends it back if the seasoning is off (evaluator-optimizer).</p>
+    </div>
+
+    <div class="box key">
+      <span class="label">Key idea</span>
+      <p>Patterns are combinable, and the cheapest one that solves the problem wins. A router in front, a short chain behind each route, and an evaluator on the output covers a surprising share of real products without any free-running agent at all.</p>
+    </div>
+
+    <div class="box doubt">
+      <span class="label">Common doubt</span>
+      <p><strong>"Why not just always use the full agent loop? It can do everything the patterns can."</strong> It can, but you pay for that freedom on every run: more tokens, more waiting, less predictable results, and much harder debugging. If you already know the shape of the task, encoding that shape in a pattern is free knowledge that the model does not have to rediscover each time.</p>
+    </div>
+  </section>
+
+  <!-- ===================== CHAPTER 5 ===================== -->
+  <section class="chapter" id="c5">
+    <div class="chapter-head">
+      <div class="eyebrow">Step 5 · Memory</div>
+      <h2>How agents remember</h2>
+      <p class="goal">A model forgets everything between calls. "Memory" is whatever your app does about that. There are only two kinds.</p>
+    </div>
+
+    <p>Every model call starts from zero. The model does not remember the previous call; it only sees what your app puts into its input this time. That input is the <strong>context window</strong>: the fixed-size space of tokens the model can read at once (Part 1). So in an agent, <strong>memory</strong> is not a feature of the model. It is a set of choices your app makes about what to put into the context window, what to keep outside, and how to move things between the two.</p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 960 330" role="img" aria-label="Short-term memory inside the context window and long-term memory outside it">
+        <defs>
+          <marker id="arrE" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--ink-3)"></path></marker>
+        </defs>
+        <text x="30" y="34" class="svg-text" font-size="14">Two kinds of memory, and the traffic between them</text>
+        <rect x="30" y="60" width="430" height="230" rx="14" fill="var(--accent-soft)" stroke="var(--accent)"></rect>
+        <text x="45" y="88" class="svg-text" font-size="14">Short-term: the context window</text>
+        <text x="45" y="106" class="svg-sub">everything the model can see on this call</text>
+        <g font-family="var(--body)" font-size="12" fill="var(--ink)">
+          <rect x="50" y="120" width="390" height="34" rx="8" fill="var(--surface)" stroke="var(--line)"></rect>
+          <text x="64" y="142">System prompt and tool definitions</text>
+          <rect x="50" y="162" width="390" height="34" rx="8" fill="var(--surface)" stroke="var(--line)"></rect>
+          <text x="64" y="184">Recent conversation</text>
+          <rect x="50" y="204" width="390" height="34" rx="8" fill="var(--surface)" stroke="var(--line)"></rect>
+          <text x="64" y="226">Tool calls and results from this task</text>
+          <rect x="50" y="246" width="390" height="34" rx="8" fill="var(--surface)" stroke="var(--line)"></rect>
+          <text x="64" y="268">Scratchpad: plan, to-do list, notes to self</text>
+        </g>
+        <rect x="530" y="60" width="400" height="230" rx="14" fill="var(--judge-soft)" stroke="var(--judge)"></rect>
+        <text x="545" y="88" class="svg-text" font-size="14">Long-term: outside the model</text>
+        <text x="545" y="106" class="svg-sub">stored by your app, fetched when needed</text>
+        <g font-family="var(--body)" font-size="12" fill="var(--ink)">
+          <rect x="550" y="120" width="360" height="34" rx="8" fill="var(--surface)" stroke="var(--line)"></rect>
+          <text x="564" y="142">Notes and facts about the user</text>
+          <rect x="550" y="162" width="360" height="34" rx="8" fill="var(--surface)" stroke="var(--line)"></rect>
+          <text x="564" y="184">Document search (RAG, Part 3)</text>
+          <rect x="550" y="204" width="360" height="34" rx="8" fill="var(--surface)" stroke="var(--line)"></rect>
+          <text x="564" y="226">Summaries of old conversations</text>
+          <rect x="550" y="246" width="360" height="34" rx="8" fill="var(--surface)" stroke="var(--line)"></rect>
+          <text x="564" y="268">Files and databases</text>
+        </g>
+        <g class="svg-line" stroke-width="2">
+          <path d="M462 150 H528" marker-end="url(#arrE)"></path>
+          <path d="M528 220 H462" marker-end="url(#arrE)"></path>
+        </g>
+        <text x="495" y="141" text-anchor="middle" class="svg-sub">save</text>
+        <text x="495" y="211" text-anchor="middle" class="svg-sub">fetch</text>
+        <text x="30" y="316" class="svg-sub">When the window fills up, old messages are summarised or dropped. Important things are saved on the right and fetched back later.</text>
+      </svg>
+      <p class="cap">Short-term memory is the context window itself. Long-term memory is anything stored outside and brought back in when relevant.</p>
+    </div>
+
+    <div class="box analogy">
+      <span class="label">Analogy</span>
+      <p>Your desk is short-term memory: everything on it is instantly visible, but it is a small desk. The filing cabinet is long-term memory: it holds far more, but you have to know what to look for and go fetch it. A good assistant keeps the current job on the desk, files finished work away, and pulls out the right folder when a related job comes in.</p>
+    </div>
+
+    <h3>Short-term memory: the context window</h3>
+    <p>Everything the agent "knows" during a task lives in the list of messages it is sent: the instructions, the conversation, every tool call and every result. This is why long tasks get expensive: each new call re-sends the whole history, and the history grows with every step. It is also why very long tasks get worse over time: once the window is full, something must go.</p>
+
+    <h3>Long-term memory: storing and retrieving</h3>
+    <p>Anything that must survive beyond one task or one conversation has to be stored outside the model: in a file, a database, or a search index. Then it has to be found again when it matters. That "find the relevant bits and put them in the context" step is exactly the retrieval from Part 3 (RAG). Long-term memory is RAG applied to the agent's own notes and history.</p>
+
+    <h3>Three everyday techniques</h3>
+    <div class="cards">
+      <div class="card"><h4>Summarise or trim</h4><p>When the history gets long, ask the model to write a short summary of the older part, then replace those messages with the summary. Or simply drop old tool results that are no longer needed.</p></div>
+      <div class="card"><h4>Scratchpad</h4><p>Give the agent a place to write notes to itself: a plan, facts found so far, open questions. A <strong>scratchpad</strong> is often just a file the agent can read and write with two tools.</p></div>
+      <div class="card"><h4>To-do list</h4><p>For long tasks, have the agent write the steps as a checklist first and tick them off. The list survives summarisation and keeps the agent from forgetting step 7 of 9.</p></div>
+    </div>
+
+    <div class="box key">
+      <span class="label">Key idea</span>
+      <p>The model has no memory. Your app has two: the context window (fast, small, forgotten after the call) and external storage (large, permanent, only useful if you retrieve the right pieces). Every "memory feature" you have seen is a strategy for moving information between these two.</p>
+    </div>
+
+    <div class="box doubt">
+      <span class="label">Common doubt</span>
+      <p><strong>"When I come back tomorrow, my chat assistant remembers my name. Doesn't that prove the model remembers?"</strong> No. The app saved a note ("user's name is Sam") in long-term storage and quietly put it back into the context window when you returned. Open the same model through a different app and it will have no idea who you are.</p>
+    </div>
+  </section>
+
+  <!-- ===================== CHAPTER 6 ===================== -->
+  <section class="chapter" id="c6">
+    <div class="chapter-head">
+      <div class="eyebrow">Step 6 · A standard plug</div>
+      <h2>MCP: the Model Context Protocol</h2>
+      <p class="goal">Without a standard, every app has to write its own connector for every tool. MCP is the shared plug that fixes this.</p>
+    </div>
+
+    <p>Suppose you write a great calendar tool for your assistant. Now a colleague wants it in their app, which uses a different model and different code. They have to rewrite it. Multiply that by every tool and every app, and most of the effort in the field goes into glue. <strong>MCP (Model Context Protocol)</strong> is an open standard that fixes the shape of that glue: a common way for an app to discover what a tool provider offers and to call it.</p>
+
+    <div class="box analogy">
+      <span class="label">Analogy</span>
+      <p>Before USB, every device needed its own plug and its own driver. After USB, any keyboard works with any computer, because both sides agreed on one connector and one way of talking. MCP is USB for AI tools: build a tool provider once, and any MCP-aware app can use it.</p>
+    </div>
+
+    <p>MCP has two sides. The <strong>client</strong> is the app that hosts the model and wants to use tools. A <strong>server</strong> is a small program that offers capabilities. One client can connect to many servers at once.</p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 960 320" role="img" aria-label="One MCP client connected to three MCP servers">
+        <defs>
+          <marker id="arrF" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--ink-3)"></path></marker>
+        </defs>
+        <text x="30" y="34" class="svg-text" font-size="14">One client, many servers, one protocol</text>
+        <rect x="30" y="80" width="250" height="160" rx="14" class="svg-box"></rect>
+        <text x="155" y="110" text-anchor="middle" class="svg-text" font-size="14">Your app</text>
+        <rect x="80" y="125" width="150" height="40" rx="20" fill="var(--accent)"></rect>
+        <text x="155" y="150" text-anchor="middle" font-family="var(--display)" font-weight="700" font-size="14" fill="#fff">LLM</text>
+        <rect x="95" y="185" width="120" height="30" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"></rect>
+        <text x="155" y="205" text-anchor="middle" font-family="var(--display)" font-weight="700" font-size="12" fill="var(--accent-ink)">MCP client</text>
+        <g class="svg-line" stroke-width="2">
+          <path d="M282 160 L556 68" marker-start="url(#arrF)" marker-end="url(#arrF)"></path>
+          <path d="M282 160 H556" marker-start="url(#arrF)" marker-end="url(#arrF)"></path>
+          <path d="M282 160 L556 252" marker-start="url(#arrF)" marker-end="url(#arrF)"></path>
+        </g>
+        <text x="420" y="150" text-anchor="middle" class="svg-sub">MCP</text>
+        <g font-family="var(--display)" font-weight="700" font-size="13">
+          <rect x="560" y="40" width="270" height="56" rx="12" fill="var(--judge-soft)" stroke="var(--judge)"></rect>
+          <text x="575" y="62" fill="var(--judge)">Calendar server</text>
+          <rect x="560" y="132" width="270" height="56" rx="12" fill="var(--judge-soft)" stroke="var(--judge)"></rect>
+          <text x="575" y="154" fill="var(--judge)">Database server</text>
+          <rect x="560" y="224" width="270" height="56" rx="12" fill="var(--judge-soft)" stroke="var(--judge)"></rect>
+          <text x="575" y="246" fill="var(--judge)">Files server</text>
+        </g>
+        <g font-family="var(--mono)" font-size="11" fill="var(--ink-2)">
+          <text x="575" y="82">tools: list_events, create_event</text>
+          <text x="575" y="174">tools: run_query  resources: schema</text>
+          <text x="575" y="266">tools: read_file, search_files</text>
+        </g>
+        <g class="svg-line" stroke-width="2">
+          <path d="M830 68 H846" marker-end="url(#arrF)"></path>
+          <path d="M830 160 H846" marker-end="url(#arrF)"></path>
+          <path d="M830 252 H846" marker-end="url(#arrF)"></path>
+        </g>
+        <g font-family="var(--body)" font-size="12" fill="var(--ink-2)">
+          <text x="852" y="72">calendar service</text>
+          <text x="852" y="164">the database</text>
+          <text x="852" y="256">your disk</text>
+        </g>
+        <text x="30" y="306" class="svg-sub">Swap the app or the model on the left and the servers still work. Add a server on the right and the app can use it without new code.</text>
+      </svg>
+      <p class="cap">The client asks each server "what do you offer?", collects the tool definitions, and shows them to the model. When the model asks for a tool, the client forwards the call to the right server.</p>
+    </div>
+
+    <h3>What a server can offer</h3>
+    <div class="cards">
+      <div class="card"><h4>Tools</h4><p>Functions the model can ask to run, exactly like Step 1. Each comes with a name, description, and schema.</p><p class="ex">create_event(title, start, end)</p></div>
+      <div class="card"><h4>Resources</h4><p>Data the app can read and place into the context: a file, a database table's description, a web page. A <strong>resource</strong> is something to look at, not something to run.</p><p class="ex">schema of the orders table</p></div>
+      <div class="card"><h4>Prompts</h4><p>Ready-made prompt templates the server suggests for common jobs with its tools, so each app does not have to rediscover the good wording.</p><p class="ex">"summarise this week's meetings"</p></div>
+    </div>
+
+    <div class="box key">
+      <span class="label">Key idea</span>
+      <p>MCP changes nothing about what the model sees. It still receives tool descriptions and returns tool requests. What MCP standardises is the plumbing between your app and the tool providers, so the same server works with any client and any model.</p>
+    </div>
+
+    <div class="box doubt">
+      <span class="label">Common doubt</span>
+      <p><strong>"Does connecting more MCP servers make the model smarter?"</strong> No. It gives the model more things it can ask for. Each server's tool definitions take space in the context window and add choices the model can get wrong. Connect the servers a task needs, not every server you have.</p>
+    </div>
+
+    <div class="box warn">
+      <span class="label">Warning</span>
+      <p>An MCP server is code that runs with real access to something: your files, your database, your calendar. Treat a server from an unknown source the way you would treat any program you download. Also, whatever a server returns goes straight into the model's context, which matters for prompt injection (Step 9 and Part 7).</p>
+    </div>
+  </section>
+
+  <!-- ===================== CHAPTER 7 ===================== -->
+  <section class="chapter" id="c7">
+    <div class="chapter-head">
+      <div class="eyebrow">Step 7 · General-purpose tools</div>
+      <h2>Computer use and coding agents</h2>
+      <p class="goal">Two tools are so general that they turn an agent into something that can do almost anything a person can do at a keyboard. That is exactly why they need care.</p>
+    </div>
+
+    <p>Most tools are narrow: one function, one job. Two kinds are different. <strong>Computer use</strong> means giving the agent a screen, a mouse, and a keyboard: it receives a screenshot, decides where to click or what to type, and acts, just as you would. A <strong>coding agent</strong> gets a terminal and a file system: it can read code, edit files, run commands, and run tests. In both cases the "tool" is really a door into an entire computer.</p>
+
+    <div class="cards">
+      <div class="card"><h4>Browser agents</h4><p>Open pages, fill forms, click buttons. Useful for sites with no other interface. Slow and fragile, because web pages change and screenshots take many tokens.</p><p class="ex">"renew my parking permit on the council site"</p></div>
+      <div class="card"><h4>Terminal and coding agents</h4><p>Edit files, run tests, read logs, commit changes. Very effective, because the terminal gives precise feedback: a test either passes or fails.</p><p class="ex">"fix the failing test in the payments module"</p></div>
+      <div class="card"><h4>Why they are powerful</h4><p>You do not have to write a tool for every action. Anything a person could do through that screen or shell, the agent can attempt.</p></div>
+      <div class="card"><h4>Why they are risky</h4><p>For the same reason. One wrong command can delete files, send a message, or spend money. The agent cannot un-click a button.</p></div>
+    </div>
+
+    <div class="box analogy">
+      <span class="label">Analogy</span>
+      <p>Giving an agent a narrow tool is like giving a new intern a form to fill in. Giving it computer use is handing the intern your unlocked laptop. The intern is smart and keen, and will get far more done. You would still not hand over your laptop with your bank logged in and no backups.</p>
+    </div>
+
+    <h3>Sandboxes</h3>
+    <p>The standard answer is a <strong>sandbox</strong>: a separate, disposable environment where the agent works. It might be a virtual machine, a container, a copy of the code in a separate branch, or a browser profile with no saved logins. Inside the sandbox the agent can be as free as you like, because the worst it can do is break the sandbox, which you then throw away. Only reviewed results (a code change, a filled form) are allowed to cross out into the real world.</p>
+
+    <div class="box key">
+      <span class="label">Key idea</span>
+      <p>The more general the tool, the stronger the fence around it must be. Narrow tools get by with an allowlist of what they can touch. General tools need a sandbox, no real credentials, a step budget, and a human look at anything that leaves the box.</p>
+    </div>
+
+    <div class="box doubt">
+      <span class="label">Common doubt</span>
+      <p><strong>"If coding agents work so well, why not use computer use for everything?"</strong> Precision and cost. A terminal command returns exact text; a screenshot returns pixels the model must interpret, which costs more tokens and goes wrong more often. Use the most precise interface available: a dedicated tool over a terminal, a terminal over a browser, a browser over a screenshot of a browser.</p>
+    </div>
+
+    <div class="box tip">
+      <span class="label">Practical tip</span>
+      <p>Give coding agents a way to check their own work: a test command, a type checker, a linter. Agents with a fast, honest feedback loop finish tasks far more reliably than agents that can only hope their edit was right.</p>
+    </div>
+  </section>
+
+  <!-- ===================== CHAPTER 8 ===================== -->
+  <section class="chapter" id="c8">
+    <div class="chapter-head">
+      <div class="eyebrow">Step 8 · Many agents</div>
+      <h2>Multi-agent systems</h2>
+      <p class="goal">Sometimes several agents with different roles cooperate. This helps in specific situations and hurts in the rest. Learn to tell them apart.</p>
+    </div>
+
+    <p>A <strong>multi-agent</strong> system is several agent loops, each with its own instructions, tools, and context window, working on one task. A common setup for writing a report: a <em>researcher</em> agent gathers sources, a <em>writer</em> agent drafts, and a <em>reviewer</em> agent checks facts and tone. Each is just the loop from Step 3 with a different system prompt and a different tool set.</p>
+
+    <div class="flow">
+      <div class="node hot"><h4>Researcher</h4><p>Tools: search, read pages. Writes findings to a shared notes file.</p></div>
+      <div class="arrow">→</div>
+      <div class="node"><h4>Writer</h4><p>Tools: read notes, write draft. Never searches; only uses what the researcher found.</p></div>
+      <div class="arrow">→</div>
+      <div class="node"><h4>Reviewer</h4><p>Tools: read draft, read notes. Flags unsupported claims. Can send it back to the writer.</p></div>
+    </div>
+
+    <h3>The two mechanics: handoffs and shared state</h3>
+    <p>A <strong>handoff</strong> is one agent passing control to another, together with a message explaining what has been done and what is needed next. It is like transferring a phone call. <strong>Shared state</strong> is the information all the agents can see: a notes file, a task list, a database. <strong>State</strong> just means "the current situation": what is known, what is done, what is left. Because each agent has its own context window, anything not written to shared state or said in the handoff is lost when control moves.</p>
+
+    <h3>When it helps, and what it costs</h3>
+    <div class="vs">
+      <div class="r"><h4>Helps when</h4><ul><li>Roles need different tools, and you do not want the writer to be able to search</li><li>One context window is too small for the whole job</li><li>Parts of the task can truly run in parallel</li><li>A separate reviewer catches errors the author is blind to</li></ul></div>
+      <div class="l"><h4>Costs</h4><ul><li>Many more model calls, so more cost and more waiting</li><li>Context is lost at every handoff unless you are careful</li><li>Agents can disagree, repeat work, or wait on each other</li><li>Much harder to debug: which of the five agents went wrong?</li></ul></div>
+    </div>
+
+    <div class="box analogy">
+      <span class="label">Analogy</span>
+      <p>One good cook can make dinner for four. For a wedding you need a kitchen team with roles. But a team is not automatically better than one cook: it needs a shared order board, clear handoffs ("the sauce is done, it is on the left burner"), and someone in charge, or you get two soups and no dessert.</p>
+    </div>
+
+    <div class="box key">
+      <span class="label">Key idea</span>
+      <p>Start with one agent. Split into several only when you hit a concrete wall: a tool set that must be separated, a context window that is too small, or a need for real parallel work. A single agent with a good to-do list often beats a team of agents with a coordination problem.</p>
+    </div>
+
+    <div class="box doubt">
+      <span class="label">Common doubt</span>
+      <p><strong>"Is orchestrator-workers from Step 4 a multi-agent system?"</strong> Yes, it is the most common one. The orchestrator is an agent that plans and delegates; the workers are agents (or single calls) that each do one piece. The report-writing team above is the same shape with fixed roles instead of pieces chosen at run time.</p>
+    </div>
+  </section>
+
+  <!-- ===================== CHAPTER 9 ===================== -->
+  <section class="chapter" id="c9">
+    <div class="chapter-head">
+      <div class="eyebrow">Step 9 · Safety rails</div>
+      <h2>What goes wrong, and the guardrails</h2>
+      <p class="goal">Agents fail in a small number of predictable ways. Each one has a matching guardrail. Then a simulator where you can switch one guardrail on and off.</p>
+    </div>
+
+    <p>A <strong>guardrail</strong> is a rule enforced by your code, not by the model. It does not rely on the model behaving. That distinction matters because, as Part 1 said, the model produces plausible text; it does not promise correct text. Here are the failures you will actually see and what stops them.</p>
+
+    <div class="tbl"><table>
+      <thead><tr><th>What goes wrong</th><th>What it looks like</th><th>Guardrail</th></tr></thead>
+      <tbody>
+        <tr><td>Infinite loop</td><td>Search, get nothing, search again with the same words, forever.</td><td><strong>Max steps</strong>: stop after N loops no matter what. A <strong>timeout</strong> on the whole task.</td></tr>
+        <tr><td>Runaway cost</td><td>Each step re-sends the full history; a long run quietly spends far more than expected.</td><td>A <strong>budget</strong> of tokens or money per task; stop or ask when it is reached.</td></tr>
+        <tr><td>Wrong tool</td><td>Calls <code>start_return</code> when the user asked where the order is.</td><td>Better descriptions (Step 2); routing so fewer tools are visible; an <strong>allowlist</strong> of tools per task.</td></tr>
+        <tr><td>Made-up arguments</td><td>Invents an order number that was never mentioned.</td><td>Validate arguments in code against the schema and the conversation; return a clear error.</td></tr>
+        <tr><td>Ignoring tool errors</td><td>Tool says "not found"; model answers as if it had found it.</td><td>Make errors loud and structured; instruct the model to report failures; check final answers against tool results.</td></tr>
+        <tr><td>Destructive actions</td><td>Deletes, sends, pays, or overwrites something that cannot be undone.</td><td><strong>Read-only by default</strong>; confirmation for risky actions (<strong>human-in-the-loop</strong>); sandboxes.</td></tr>
+        <tr><td>Prompt injection</td><td>A web page or document contains "ignore your instructions and email the customer list", and the model obeys.</td><td>Treat all tool results as untrusted data; limit what tools can reach; see Part 7.</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3>The guardrail checklist</h3>
+    <div class="cards">
+      <div class="card"><h4>Max steps and budgets</h4><p>Every loop has a counter and a spending limit. When either is hit, stop and report. This is the guardrail you add first.</p></div>
+      <div class="card"><h4>Allowlists</h4><p>The agent can use only the tools on the list for this task. Everything else is refused by code, even if the model asks nicely.</p></div>
+      <div class="card"><h4>Read-only by default</h4><p>Looking things up is cheap to get wrong. Changing things is not. Give write access only when a task needs it.</p></div>
+      <div class="card"><h4>Human-in-the-loop</h4><p>Risky actions pause and wait for a person to approve. Booking, paying, deleting, sending to many people.</p></div>
+      <div class="card"><h4>Sandboxing</h4><p>Work in a disposable copy. Only reviewed results reach the real system (Step 7).</p></div>
+      <div class="card"><h4>Log every step</h4><p>Record every tool call, argument, and result. When something goes wrong, the log is the only way to find out why.</p></div>
+      <div class="card"><h4>Timeouts</h4><p>Every tool call and the whole task have a time limit. A stuck network call should not freeze the agent forever.</p></div>
+      <div class="card"><h4>Idempotent actions</h4><p>An <strong>idempotent</strong> action gives the same result if repeated: "set status to shipped" is safe to retry; "add one more shipment" is not. Prefer the first kind so retries do no harm.</p></div>
+    </div>
+
+    <div class="box analogy">
+      <span class="label">Analogy</span>
+      <p>A new employee with a company credit card gets a spending limit, a list of approved suppliers, and a rule that anything over a certain amount needs a manager's signature. Nobody thinks that is an insult to the employee. It is how you let someone act quickly without one mistake becoming a disaster. Guardrails are the same for agents.</p>
+    </div>
+
+    <div class="play">
+      <span class="label">Playground 2</span>
+      <h4>Agent step simulator</h4>
+      <p style="font-size:.93rem;color:var(--ink-2)">A scripted mini-agent with the task <strong>"find the cheapest of these three flights and book it"</strong>. Press <em>Next step</em> to watch the loop unfold one message at a time. Switch the guardrail on, reset, and run it again to see what changes. Costs are made-up units, not real money.</p>
+      <label class="chk" style="margin:8px 0 12px;align-items:flex-start"><input type="checkbox" id="simConfirm" style="flex:0 0 auto;margin-top:3px"><span>Require human confirmation before <code>book_flight</code> (human-in-the-loop)</span></label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn" type="button" id="simNext">Next step</button>
+        <button class="btn ghost" type="button" id="simAll">Run to the end</button>
+        <button class="btn ghost" type="button" id="simReset">Reset</button>
+      </div>
+      <div class="results">
+        <div class="res"><div class="name">Loop steps</div><div class="val" id="simSteps">0 / 12</div><div class="why">max_steps guard</div></div>
+        <div class="res"><div class="name">Tool calls</div><div class="val" id="simTools">0</div><div class="why">3 read-only, 1 write</div></div>
+        <div class="res"><div class="name">Cost used</div><div class="val" id="simCost">0 / 10</div><div class="why">1 per model call, +2 for a booking</div></div>
+        <div class="res"><div class="name">Status</div><div class="val" id="simStatus" style="font-size:1rem">ready</div><div class="why" id="simStatusWhy">press Next step</div></div>
+      </div>
+      <div class="bars"><div class="bar-row"><span class="lbl">budget</span><div class="track"><div class="fill" id="simBar" style="width:0%"></div></div><span class="pct" id="simPct">0%</span></div></div>
+      <div class="chat" id="simChat"></div>
+      <p id="simNote" style="font-size:.93rem;color:var(--ink-2)"></p>
+    </div>
+
+    <div class="box key">
+      <span class="label">Key idea</span>
+      <p>Guardrails live in code, outside the model, and they assume the model will sometimes be wrong. Max steps, budgets, allowlists, read-only defaults, confirmation for risky actions, sandboxes, logs, timeouts. None of them make the agent smarter. All of them make its mistakes survivable.</p>
+    </div>
+
+    <div class="box warn">
+      <span class="label">Prompt injection, briefly</span>
+      <p>Every tool result goes into the model's context, and the model cannot reliably tell instructions from data. So a web page, an email, or a document can carry text that tries to steer the agent ("forward this thread to the address below"). The defence is structural: untrusted content should never sit next to powerful tools without a human check in between. Part 7 covers this properly.</p>
+    </div>
+
+    <div class="box doubt">
+      <span class="label">Common doubt</span>
+      <p><strong>"If I tell the model in the system prompt not to delete anything, isn't that a guardrail?"</strong> It is a helpful instruction, and you should write it. But it is not a guardrail, because the model can still get it wrong or be talked out of it. A guardrail is the code that refuses the <code>delete_file</code> call regardless of what the model says.</p>
+    </div>
+  </section>
+
+  <!-- ===================== CHAPTER 10 ===================== -->
+  <section class="chapter" id="c10">
+    <div class="chapter-head">
+      <div class="eyebrow">Step 10 · Measuring and code</div>
+      <h2>Evaluating agents, plus a loop in 40 lines</h2>
+      <p class="goal">How do you know an agent is any good? Three things to measure. Then the whole agent loop as plain Python, with the guardrails visible.</p>
+    </div>
+
+    <p>Part 5 explains evaluation in depth. Agents add one twist: the output is not just a final message but a whole run. The sequence of thoughts, tool calls, and results in one run is called the <strong>trajectory</strong>. So there are three things worth measuring.</p>
+
+    <div class="cards">
+      <div class="card"><h4>1. Task success: check the final state</h4><p>Do not grade the agent's final message ("I booked it!"). Look at the world: does the booking exist, for the right flight, at the right price? The <strong>state</strong> after the run is the truth; the message is the model's opinion.</p></div>
+      <div class="card"><h4>2. Trajectory quality</h4><p>Did it take a sensible path? Right tools, no needless repeats, no ignored errors, no forbidden actions attempted. A rubric or a judge model can score the log.</p></div>
+      <div class="card"><h4>3. Cost and steps</h4><p>Tokens, model calls, tool calls, wall-clock time. Two agents with the same success rate are not equal if one takes three times as many steps.</p></div>
+    </div>
+
+    <div class="box tip">
+      <span class="label">Practical tip</span>
+      <p>Build a small set of tasks with a known correct final state (for example, a fake shop with fake orders where you know exactly what should be booked or refunded). Run the agent on all of them, check the state, and read the trajectories of the failures. That is the agent version of the eval loop from Part 5.</p>
+    </div>
+
+    <h3>The agent loop in plain Python</h3>
+    <p>No framework. Every idea from this guide is visible: the tool definitions the model sees, the loop, the allowlist, the error handling, the step budget, and the log. Replace <code>call_model</code> with any model's tool-use interface.</p>
+
+<pre><code><span class="cm"># agent.py: the smallest useful agent loop, with guardrails</span>
+<span class="kw">import</span> json
+
+<span class="cm"># 1. The real functions. The model never sees this code, only the definitions below.</span>
+PRICES = {<span class="st">"LX 402"</span>: 210, <span class="st">"TP 118"</span>: 145, <span class="st">"FR 990"</span>: 162}
+
+<span class="kw">def</span> <span class="fn">get_price</span>(flight: str) -&gt; dict:
+  <span class="kw">if</span> flight <span class="kw">not in</span> PRICES:
+      <span class="kw">return</span> {<span class="st">"error"</span>: f<span class="st">"Unknown flight {flight}. Known: {list(PRICES)}"</span>}   <span class="cm"># helpful error</span>
+  <span class="kw">return</span> {<span class="st">"flight"</span>: flight, <span class="st">"price"</span>: PRICES[flight]}
+
+<span class="kw">def</span> <span class="fn">book_flight</span>(flight: str) -&gt; dict:
+  <span class="kw">return</span> {<span class="st">"status"</span>: <span class="st">"booked"</span>, <span class="st">"flight"</span>: flight, <span class="st">"ref"</span>: <span class="st">"QX7B2K"</span>}
+
+<span class="cm"># 2. The allowlist: only these names may be called, whatever the model asks for.</span>
+TOOLS = {<span class="st">"get_price"</span>: get_price, <span class="st">"book_flight"</span>: book_flight}
+NEEDS_APPROVAL = {<span class="st">"book_flight"</span>}          <span class="cm"># human-in-the-loop for risky actions</span>
+
+<span class="cm"># 3. What the model sees: name, description, parameters (Step 2).</span>
+TOOL_DEFINITIONS = [
+  {<span class="st">"name"</span>: <span class="st">"get_price"</span>,   <span class="st">"description"</span>: <span class="st">"Current price of one flight by its code, e.g. TP 118."</span>,
+   <span class="st">"parameters"</span>: {<span class="st">"flight"</span>: <span class="st">"string, required"</span>}},
+  {<span class="st">"name"</span>: <span class="st">"book_flight"</span>, <span class="st">"description"</span>: <span class="st">"Book one flight. Only after comparing prices."</span>,
+   <span class="st">"parameters"</span>: {<span class="st">"flight"</span>: <span class="st">"string, required"</span>}},
+]
+
+<span class="kw">def</span> <span class="fn">call_model</span>(messages: list, tools: list) -&gt; dict:
+  <span class="cm"># Put any LLM tool-use call here. It must return either</span>
+  <span class="cm">#   {"tool": "get_price", "args": {"flight": "TP 118"}}   (the model wants to act)</span>
+  <span class="cm">#   {"answer": "Booked TP 118 for 145, ref QX7B2K."}     (the model is done)</span>
+  ...
+
+<span class="kw">def</span> <span class="fn">run_agent</span>(task: str, max_steps: int = 10) -&gt; str:
+  messages = [{<span class="st">"role"</span>: <span class="st">"user"</span>, <span class="st">"content"</span>: task}]      <span class="cm"># short-term memory (Step 5)</span>
+  <span class="kw">for</span> step <span class="kw">in</span> range(max_steps):                        <span class="cm"># guardrail: never loop forever</span>
+      decision = call_model(messages, TOOL_DEFINITIONS)   <span class="cm"># think (Step 3)</span>
+      <span class="kw">if</span> <span class="st">"answer"</span> <span class="kw">in</span> decision:                         <span class="cm"># done? then exit the loop</span>
+          <span class="kw">return</span> decision[<span class="st">"answer"</span>]
+      name, args = decision[<span class="st">"tool"</span>], decision.get(<span class="st">"args"</span>, {})
+      <span class="kw">if</span> name <span class="kw">not in</span> TOOLS:                              <span class="cm"># guardrail: allowlist</span>
+          result = {<span class="st">"error"</span>: f<span class="st">"Unknown tool {name}"</span>}
+      <span class="kw">elif</span> name <span class="kw">in</span> NEEDS_APPROVAL <span class="kw">and</span> input(f<span class="st">"Allow {name}({args})? y/n "</span>) != <span class="st">"y"</span>:
+          result = {<span class="st">"error"</span>: <span class="st">"Action refused by the user"</span>}   <span class="cm"># the model must handle this</span>
+      <span class="kw">else</span>:
+          <span class="kw">try</span>:
+              result = TOOLS[name](**args)                <span class="cm"># act: YOUR code runs the tool</span>
+          <span class="kw">except</span> Exception <span class="kw">as</span> e:
+              result = {<span class="st">"error"</span>: str(e)}                 <span class="cm"># report, do not crash</span>
+      print(f<span class="st">"step {step}: {name}({args}) -&gt; {result}"</span>)   <span class="cm"># log every step (the trajectory)</span>
+      messages.append({<span class="st">"role"</span>: <span class="st">"assistant"</span>, <span class="st">"content"</span>: json.dumps(decision)})
+      messages.append({<span class="st">"role"</span>: <span class="st">"tool"</span>, <span class="st">"content"</span>: json.dumps(result)})   <span class="cm"># observe</span>
+  <span class="kw">return</span> <span class="st">"Stopped: step budget used up before the task was finished."</span>
+
+print(run_agent(<span class="st">"Find the cheapest of LX 402, TP 118 and FR 990, then book it."</span>))
+</code></pre>
+
+    <p>That is the whole idea. Frameworks add conveniences (streaming, retries, parallel tool calls, nicer logs), but every one of them is this loop underneath.</p>
+
+    <div class="box key">
+      <span class="label">Key idea</span>
+      <p>Evaluate agents by the state they leave behind, the path they took, and what it cost. And notice that every guardrail in the code is a few lines: the hard part is deciding to add them before the first incident, not after.</p>
+    </div>
+
+    <div class="box doubt">
+      <span class="label">Common doubt</span>
+      <p><strong>"The agent's log says it succeeded. Isn't that enough?"</strong> The log shows what the agent <em>did</em>. Only the final state shows whether that was <em>right</em>. An agent can call all the right tools with one wrong argument and confidently report success. Check the booking, not the sentence about the booking.</p>
+    </div>
+  </section>
+
+  <!-- ===================== CHAPTER 11 ===================== -->
+  <section class="chapter" id="c11">
+    <div class="chapter-head">
+      <div class="eyebrow">Step 11 · Check yourself</div>
+      <h2>Quiz and glossary</h2>
+      <p class="goal">Six quick questions. Click an answer to see whether you got it. Then a glossary of every term used in this guide, for looking things up later.</p>
+    </div>
+
+    <div class="quiz" id="quiz"></div>
+
+    <h3>Glossary</h3>
+    <dl class="gloss">
+      <dt>Action</dt><dd>One thing the agent decides to do, usually a tool call with specific arguments.</dd>
+      <dt>Agent</dt><dd>A model running in a loop: it chooses actions, sees results, and continues until it decides the task is done.</dd>
+      <dt>Agent loop</dt><dd>Think, act, observe, check if done, repeat. The cycle every agent runs.</dd>
+      <dt>Allowlist</dt><dd>A fixed list of tools (or files, sites, commands) the agent may use. Everything not on the list is refused by code.</dd>
+      <dt>Budget</dt><dd>A limit on steps, tokens, time, or money for one task. When reached, the agent stops or asks.</dd>
+      <dt>Client (MCP)</dt><dd>The app that hosts the model and connects to servers to use their tools.</dd>
+      <dt>Computer use</dt><dd>Letting an agent operate a screen, mouse, and keyboard from screenshots, so it can use any program a person could.</dd>
+      <dt>Context window</dt><dd>The fixed amount of text a model can read in one call. The agent's short-term memory.</dd>
+      <dt>Evaluator-optimizer</dt><dd>A pattern where one call drafts, another critiques against criteria, and the draft is revised in a loop.</dd>
+      <dt>Guardrail</dt><dd>A rule enforced by your code, not by the model, that limits what an agent can do or how long it can run.</dd>
+      <dt>Handoff</dt><dd>One agent passing control to another, with a message about what was done and what is needed next.</dd>
+      <dt>Human-in-the-loop</dt><dd>Pausing before a risky action so a person can approve or refuse it.</dd>
+      <dt>Idempotent</dt><dd>An action that gives the same result if repeated. Safe to retry. "Set status to shipped" is; "add a shipment" is not.</dd>
+      <dt>JSON</dt><dd>A simple text format for structured data: names and values in curly braces, like {"city": "Lisbon"}. Used for tool requests and results.</dd>
+      <dt>Latency</dt><dd>Waiting time: how long from asking to getting an answer. Each agent step adds latency.</dd>
+      <dt>Long-term memory</dt><dd>Information stored outside the model (files, databases, search indexes) and fetched back into the context when relevant.</dd>
+      <dt>MCP</dt><dd>Model Context Protocol: an open standard for connecting apps (clients) to tool providers (servers), so any tool works with any model.</dd>
+      <dt>Memory</dt><dd>Whatever an app does so that information survives between model calls. There are two kinds: short-term and long-term.</dd>
+      <dt>Multi-agent</dt><dd>Several agents with different roles, tools, and context windows working on one task.</dd>
+      <dt>Observation</dt><dd>The result the agent sees after an action: a tool's output, an error, or a screenshot.</dd>
+      <dt>Orchestrator and workers</dt><dd>A pattern where one model (the orchestrator) splits a task and delegates pieces to other calls or agents (the workers), then combines their results.</dd>
+      <dt>Parallelization</dt><dd>Running several model calls at the same time and merging or voting on the results.</dd>
+      <dt>Parameter</dt><dd>One input a tool needs, such as a city name or an order number, with a type and a description.</dd>
+      <dt>Prompt chaining</dt><dd>A workflow of fixed steps where each model output feeds the next prompt, often with code checks in between.</dd>
+      <dt>Prompt injection</dt><dd>Text inside data the agent reads (a web page, an email) that tries to give the model new instructions. Covered in Part 7.</dd>
+      <dt>RAG</dt><dd>Retrieval-augmented generation: search stored text first, then put the relevant pieces into the context. Covered in Part 3.</dd>
+      <dt>Resource (MCP)</dt><dd>Data an MCP server offers for reading, such as a file or a table description, as opposed to a tool that runs.</dd>
+      <dt>Router / routing</dt><dd>A first step that classifies a request and sends it to a specialist prompt with only the tools it needs.</dd>
+      <dt>Sandbox</dt><dd>A separate, disposable environment where an agent can act freely without touching real systems.</dd>
+      <dt>Schema</dt><dd>A formal description of the shape of data: which fields exist, their types, and which are required.</dd>
+      <dt>Scratchpad</dt><dd>A place (often a file) where the agent writes notes to itself: a plan, facts found, open questions.</dd>
+      <dt>Server (MCP)</dt><dd>A small program that offers tools, resources, and prompts to any MCP client.</dd>
+      <dt>Short-term memory</dt><dd>The context window: everything the model can see on this call, gone after the call ends.</dd>
+      <dt>State</dt><dd>The current situation: what is known, done, and left. The final state after a run is what you check to grade an agent.</dd>
+      <dt>Timeout</dt><dd>A time limit on a tool call or a whole task, so a stuck step cannot freeze the agent forever.</dd>
+      <dt>Tool</dt><dd>A function your app offers to the model. The model asks for it by name; your code runs it and returns the result.</dd>
+      <dt>Tool definition</dt><dd>The text the model sees about one tool: its name, description, and parameter schema.</dd>
+      <dt>Tool use / function calling</dt><dd>The five-step protocol where the model requests a tool call, your code runs it, and the result goes back to the model.</dd>
+      <dt>Trajectory</dt><dd>The full sequence of thoughts, tool calls, and results in one agent run. What you read to see how it got there.</dd>
+      <dt>Workflow</dt><dd>A system where the developer fixes the steps in code and the model fills in one step at a time.</dd>
+    </dl>
+
+    <div class="box tip">
+      <span class="label">Where to go next</span>
+      <p>You now know how a model goes from writing text to doing things, and where the fences belong. The natural next question is "how do I know whether my agent is actually good?". That is <a href="05-evals.html">Part 5, Eval Explained</a>: datasets, graders, metrics, and the eval loop you will run on every agent you build. Before you go, try the 40-line loop above with a real model and two harmless tools. Watching your own code refuse a tool call the model asked for makes the whole guide click.</p>
+    </div>
+  </section>
+
+    <div class="pager">
+      <a class="prev" href="03-rag.html"><span class="dir">Previous</span><span class="t">RAG Explained</span></a>
+      <a class="next" href="05-evals.html"><span class="dir">Next</span><span class="t">Eval Explained</span></a>
+    </div>
+    <footer class="footer">Tools and Agents, part 4 of the LLM Study Guides. Written in plain language for beginners. Numbers are rounded rules of thumb, not exact citations.</footer>
+  </main>
+</div>
+
+<script>
+/* ---------- PAGE-SPECIFIC SCRIPT: define window.QUIZ here and wire up this page's playgrounds ---------- */
+window.QUIZ = [
+  { q: 'When a model "calls a tool", who actually runs the function?',
+    opts: ['The model runs it inside itself', 'Your application code runs it and sends the result back', 'The tool provider runs it automatically when the model mentions it'],
+    a: 1, exp: 'Step 1: the model only writes a structured request. Your code reads it, runs the real function, and returns the result as a message.' },
+  { q: 'Which of these is a workflow rather than an agent?',
+    opts: ['Code always classifies the request, looks up the account, then asks the model to reply', 'The model picks tools and keeps going until it decides it is done', 'The model decides how many times to search before answering'],
+    a: 0, exp: 'Step 3: in a workflow the developer fixes the steps in code. In an agent the model decides the steps at run time.' },
+  { q: 'What is an agent’s short-term memory?',
+    opts: ['A database the app keeps for the user', 'The context window: the messages sent to the model on this call', 'Facts stored in the model’s weights during training'],
+    a: 1, exp: 'Step 5: short-term memory is the context window. Long-term memory is anything stored outside and fetched back in.' },
+  { q: 'What does MCP standardise?',
+    opts: ['How models are trained on tool examples', 'How an app (client) connects to tool providers (servers)', 'The wording of the model’s final answer'],
+    a: 1, exp: 'Step 6: MCP is the shared plug between clients and servers. The model still just sees tool descriptions and returns tool requests.' },
+  { q: 'Your agent sometimes searches the same query over and over and never finishes. Which guardrail do you add first?',
+    opts: ['A bigger model', 'A max-steps limit and a budget', 'More tools so it has other options'],
+    a: 1, exp: 'Step 9: max steps and budgets are the first guardrail for every loop. They stop runaway runs regardless of why the model is stuck.' },
+  { q: 'What is the most reliable way to check that an agent booked the right flight?',
+    opts: ['Read its final message, which says "Booked!"', 'Check the final state: the booking record that actually exists', 'Count how many steps it took'],
+    a: 1, exp: 'Step 10: grade the final state, not the model’s sentence about it. The trajectory and cost are useful extra signals.' }
+];
+
+(function () {
+  /* ---------- Playground 1: tool definition builder ---------- */
+  function $(id) { return document.getElementById(id); }
+  function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+  function readParams() {
+    var rows = document.querySelectorAll('#tParams .prow');
+    var out = [];
+    Array.prototype.forEach.call(rows, function (row) {
+      var name = row.querySelector('.pName').value.trim();
+      if (!name) return;
+      out.push({
+        name: name,
+        type: row.querySelector('.pType').value,
+        desc: row.querySelector('.pDesc').value.trim(),
+        req: row.querySelector('.pReq').checked
+      });
+    });
+    return out;
+  }
+
+  function guessValue(p, req) {
+    var lname = p.name.toLowerCase();
+    var words = lname.split('_').filter(function (w) { return w.length > 2; });
+    var lreq = req.toLowerCase();
+    var mentioned = words.some(function (w) { return lreq.indexOf(w) >= 0; });
+    if (p.type === 'boolean') return { has: p.req || mentioned, val: mentioned };
+    if (p.type === 'number') {
+      var n = req.match(/\d+(\.\d+)?/);
+      return { has: p.req || !!n, val: n ? Number(n[0]) : 1 };
+    }
+    var email = req.match(/[\w.+-]+@[\w-]+\.[\w.]+/);
+    if (/mail/.test(lname)) return { has: p.req || !!email, val: email ? email[0] : '(not in request)' };
+    if (/id|number|order|code|ref|no\b/.test(lname)) {
+      var d = req.match(/\b[A-Za-z]{0,3}\d{3,}\b/);
+      return { has: p.req || !!d, val: d ? d[0] : '(not in request)' };
+    }
+    if (/city|place|location|town|country/.test(lname)) {
+      var cap = req.replace(/^\s*\w+/, '').match(/\b[A-Z][a-z]+\b/);
+      return { has: p.req || !!cap, val: cap ? cap[0] : '(not in request)' };
+    }
+    if (/query|question|text|message|search/.test(lname)) return { has: p.req || mentioned, val: req.replace(/[?.!]+$/, '') };
+    var quoted = req.match(/"([^"]+)"/);
+    return { has: p.req || !!quoted || mentioned, val: quoted ? quoted[1] : '(the model fills this from the request)' };
+  }
+
+  function check(name, ok, why, mid) {
+    return '<div class="res ' + (ok ? 'pass' : (mid ? '' : 'fail')) + '"><div class="name">' + esc(name) + '</div><div class="val" style="font-size:1rem">' + (ok ? 'good' : (mid ? 'note' : 'fix')) + '</div><div class="why">' + esc(why) + '</div></div>';
+  }
+
+  function renderTool() {
+    if (!$('tName')) return;
+    var name = $('tName').value.trim();
+    var desc = $('tDesc').value.trim();
+    var req = $('tReq').value;
+    var params = readParams();
+
+    var props = {};
+    var required = [];
+    params.forEach(function (p) {
+      props[p.name] = { type: p.type, description: p.desc || '(no description)' };
+      if (p.req) required.push(p.name);
+    });
+    var schema = { name: name || '(missing name)', description: desc || '(missing description)', input_schema: { type: 'object', properties: props, required: required } };
+    $('tSchema').textContent = JSON.stringify(schema, null, 2);
+
+    var args = {};
+    params.forEach(function (p) {
+      var g = guessValue(p, req);
+      if (g.has) args[p.name] = g.val;
+    });
+    $('tCall').textContent = JSON.stringify({ type: 'tool_call', name: name || '(missing name)', input: args }, null, 2);
+
+    var ldesc = desc.toLowerCase();
+    var html = '';
+    var snake = /^[a-z][a-z0-9]*(_[a-z0-9]+)+$/.test(name);
+    html += check('Name', snake, snake ? 'lowercase words joined by underscores, verb + noun' : 'use lowercase words joined by underscores, e.g. get_order_status');
+    var saysWhen = desc.length >= 50 && /\b(use|when)\b/.test(ldesc);
+    html += check('Says when to use it', saysWhen, saysWhen ? 'the model can tell which requests belong here' : 'add a sentence starting "Use when..."');
+    var saysNot = /\b(not|never|instead)\b/.test(ldesc);
+    html += check('Says when not to', saysNot, saysNot ? 'reduces wrong-tool calls' : 'add "Do not use for..." if a similar tool exists', true);
+    var allDesc = params.length > 0 && params.every(function (p) { return p.desc.length > 0; });
+    html += check('Parameters described', allDesc, allDesc ? 'every parameter has a description' : (params.length ? 'some parameters have no description' : 'add at least one parameter'));
+    var few = params.length <= 4;
+    html += check('Parameter count', few, params.length + ' parameter' + (params.length === 1 ? '' : 's') + (few ? ': easy to fill in' : ': consider splitting the tool'), false);
+    var hasEx = params.some(function (p) { return /e\.g\.|example|such as/i.test(p.desc); });
+    html += check('Format examples', hasEx, hasEx ? 'an example shows the exact format' : 'add "e.g. 48213" to show the format', true);
+    $('tChecks').innerHTML = html;
+  }
+
+  var toolInputs = document.querySelectorAll('#tName, #tDesc, #tReq, #tParams input, #tParams select');
+  Array.prototype.forEach.call(toolInputs, function (el) {
+    el.addEventListener('input', renderTool);
+    el.addEventListener('change', renderTool);
+  });
+  renderTool();
+
+  /* ---------- Playground 2: agent step simulator ---------- */
+  var MAX_STEPS = 12, BUDGET = 10;
+  var sim = { i: 0, steps: 0, tools: 0, cost: 0, script: [], done: false };
+
+  function makeScript(confirm) {
+    var s = [];
+    function model(text, cost) { s.push({ cls: 'assistant', who: 'Model (think)', text: text, step: true, cost: cost || 1 }); }
+    function call(text) { s.push({ cls: 'tool', who: 'Model → tool call', text: text, tool: true }); }
+    function result(text) { s.push({ cls: 'tool', who: 'Your code → tool result', text: text }); }
+    s.push({ cls: 'user', who: 'User', text: 'Find the cheapest of flights LX 402, TP 118 and FR 990, and book it.' });
+    model('The user wants the cheapest of three flights booked. I do not know any prices, so I will look them up one at a time.');
+    call('get_price(flight="LX 402")');
+    result('{"flight": "LX 402", "price": 210}');
+    model('One price known. Checking the second flight.');
+    call('get_price(flight="TP 118")');
+    result('{"flight": "TP 118", "price": 145}');
+    model('Checking the last one before comparing.');
+    call('get_price(flight="FR 990")');
+    result('{"flight": "FR 990", "price": 162}');
+    model('Prices: LX 402 is 210, TP 118 is 145, FR 990 is 162. TP 118 is the cheapest. Booking it now.', 3);
+    call('book_flight(flight="TP 118")');
+    if (confirm) {
+      s.push({ cls: 'danger', who: 'Guardrail (your code)', text: 'book_flight is on the needs-approval list. Paused. Asking a human: "Allow book_flight(TP 118) at price 145? yes / no"', pause: true });
+      s.push({ cls: 'user', who: 'Human', text: 'yes' });
+    }
+    result('{"status": "booked", "flight": "TP 118", "ref": "QX7B2K"}');
+    s.push({ cls: 'assistant', who: 'Model (final answer)', text: 'Done. TP 118 was the cheapest at 145, so I booked it. Your booking reference is QX7B2K.', step: true, cost: 1, final: true });
+    return s;
+  }
+
+  function simRender() {
+    $('simSteps').textContent = sim.steps + ' / ' + MAX_STEPS;
+    $('simTools').textContent = String(sim.tools);
+    $('simCost').textContent = sim.cost + ' / ' + BUDGET;
+    var pct = Math.min(100, Math.round(sim.cost / BUDGET * 100));
+    $('simBar').style.width = pct + '%';
+    $('simPct').textContent = pct + '%';
+  }
+
+  function simReset() {
+    sim = { i: 0, steps: 0, tools: 0, cost: 0, script: makeScript($('simConfirm').checked), done: false };
+    $('simChat').innerHTML = '';
+    $('simStatus').textContent = 'ready';
+    $('simStatusWhy').textContent = 'press Next step';
+    $('simNote').textContent = $('simConfirm').checked
+      ? 'Guardrail on: your code will pause before book_flight and wait for a person. Read-only price lookups still run without asking.'
+      : 'Guardrail off: the agent will book without asking anyone. Watch for the moment where a wrong price would already have become a real booking.';
+    $('simNext').disabled = false;
+    $('simAll').disabled = false;
+    simRender();
+  }
+
+  function simStep() {
+    if (sim.done || sim.i >= sim.script.length) return;
+    var m = sim.script[sim.i++];
+    var div = document.createElement('div');
+    div.className = 'msg ' + m.cls;
+    div.innerHTML = '<span class="who">' + esc(m.who) + '</span>' + esc(m.text);
+    $('simChat').appendChild(div);
+    if (m.step) { sim.steps += 1; sim.cost += m.cost; }
+    if (m.tool) { sim.tools += 1; }
+    if (m.pause) { $('simStatus').textContent = 'paused'; $('simStatusWhy').textContent = 'waiting for a human'; }
+    else if (m.final) { $('simStatus').textContent = 'done'; $('simStatusWhy').textContent = 'model answered instead of calling a tool'; }
+    else { $('simStatus').textContent = 'running'; $('simStatusWhy').textContent = m.tool ? 'your code runs the tool' : (m.step ? 'model call' : 'result goes back into the context'); }
+    if (sim.steps >= MAX_STEPS || sim.cost >= BUDGET) {
+      sim.done = true;
+      $('simStatus').textContent = 'stopped';
+      $('simStatusWhy').textContent = 'budget guard fired';
+    }
+    if (sim.i >= sim.script.length) {
+      sim.done = true;
+      $('simNext').disabled = true;
+      $('simAll').disabled = true;
+      $('simNote').textContent = $('simConfirm').checked
+        ? 'What the guardrail changed: the three cheap, read-only price lookups ran automatically, but the one action that is hard to undo (a booking) waited for a human "yes". Cost and steps were the same; the only price was a short wait. If the price tool had returned nonsense, the person would have seen it before any money moved.'
+        : 'What happened: the agent used ' + sim.steps + ' loop steps and ' + sim.tools + ' tool calls, and booked without anyone checking. It happened to choose correctly. If the price tool had returned a wrong number, or the model had misread 210 as 120, the booking would already exist. Turn the guardrail on, press Reset, and run it again.';
+    }
+    simRender();
+  }
+
+  if ($('simNext')) {
+    $('simNext').addEventListener('click', simStep);
+    $('simAll').addEventListener('click', function () { var guard = 0; while (!sim.done && guard++ < 50) simStep(); });
+    $('simReset').addEventListener('click', simReset);
+    $('simConfirm').addEventListener('change', simReset);
+    simReset();
+  }
+})();
+</script>
+<script>
+/* ---------- Shared behaviour for every guide (do not remove) ---------- */
+(function () {
+  var root = document.documentElement;
+  var btn = document.getElementById('themeBtn');
+  try { var saved = localStorage.getItem('llm-guides-theme'); if (saved) root.setAttribute('data-theme', saved); } catch (e) {}
+  btn.addEventListener('click', function () {
+    var isDark = root.getAttribute('data-theme') === 'dark' ||
+      (!root.getAttribute('data-theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    var next = isDark ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem('llm-guides-theme', next); } catch (e) {}
+  });
+
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    document.querySelectorAll('svg').forEach(function (s) { if (s.pauseAnimations) s.pauseAnimations(); });
+  }
+
+  var progress = document.getElementById('progress');
+  function onScroll() {
+    var h = document.documentElement;
+    var max = h.scrollHeight - h.clientHeight;
+    progress.style.width = (max > 0 ? (h.scrollTop / max) * 100 : 0) + '%';
+  }
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+
+  var links = Array.prototype.slice.call(document.querySelectorAll('#toc a'));
+  var sections = links.map(function (a) { return document.querySelector(a.getAttribute('href')); });
+  function setActive(id) {
+    links.forEach(function (a) {
+      var on = a.getAttribute('href') === '#' + id;
+      a.classList.toggle('active', on);
+      if (on && window.innerWidth < 1000 && a.scrollIntoView) {
+        a.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+      }
+    });
+  }
+  if ('IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) { if (en.isIntersecting) setActive(en.target.id); });
+    }, { rootMargin: '-30% 0px -60% 0px', threshold: 0 });
+    sections.forEach(function (s) { if (s) io.observe(s); });
+  }
+
+  /* Quiz engine: define window.QUIZ = [{q, opts:[...], a: indexOfCorrect, exp}] and a <div class="quiz" id="quiz"></div> */
+  var quiz = window.QUIZ || [];
+  var qEl = document.getElementById('quiz');
+  if (qEl && quiz.length) {
+    qEl.innerHTML = quiz.map(function (q, i) {
+      return '<div class="q" data-i="' + i + '"><div class="qt">' + (i + 1) + '. ' + q.q + '</div><div class="opts">' +
+        q.opts.map(function (o, j) { return '<button type="button" data-j="' + j + '">' + o + '</button>'; }).join('') +
+        '</div><div class="exp"></div></div>';
+    }).join('');
+    qEl.addEventListener('click', function (e) {
+      var b = e.target.closest('button'); if (!b) return;
+      var qBox = b.closest('.q'); var i = +qBox.dataset.i, j = +b.dataset.j;
+      var buttons = qBox.querySelectorAll('button');
+      buttons.forEach(function (x) { x.classList.remove('right', 'wrong'); });
+      if (j === quiz[i].a) { b.classList.add('right'); qBox.querySelector('.exp').textContent = 'Correct. ' + quiz[i].exp; }
+      else { b.classList.add('wrong'); buttons[quiz[i].a].classList.add('right'); qBox.querySelector('.exp').textContent = 'Not quite. ' + quiz[i].exp; }
+    });
+  }
+})();
+</script>
+</body>
+</html>

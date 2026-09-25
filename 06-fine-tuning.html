@@ -1,0 +1,1404 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Fine-Tuning</title>
+<meta name="description" content="A plain-language guide to when and how to train a large language model on your own examples: prompting versus RAG versus fine-tuning, LoRA and QLoRA, training data, loss curves, evaluation and serving.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+  /* ---------- Tokens ---------- */
+  :root {
+    color-scheme: light;
+    --bg: #F5F6FB;
+    --surface: #FFFFFF;
+    --surface-2: #ECEEF8;
+    --ink: #1A1D33;
+    --ink-2: #4A4F6A;
+    --ink-3: #7A7F9A;
+    --line: #D9DCEC;
+    --accent: #3B4FE0;
+    --accent-ink: #2B3BB3;
+    --accent-soft: #E3E7FF;
+    --good: #0E9E8A;
+    --good-soft: #D6F4EE;
+    --bad: #E0544C;
+    --bad-soft: #FCE3E1;
+    --judge: #C8820A;
+    --judge-soft: #FFF0D2;
+    --human: #8A4FD6;
+    --human-soft: #EEE4FF;
+    --code-bg: #1C1F3A;
+    --code-ink: #E8EAF6;
+    --shadow: 0 1px 2px rgba(26,29,51,.06), 0 8px 24px rgba(26,29,51,.06);
+    --radius: 14px;
+    --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+    --body: "Atkinson Hyperlegible", "Helvetica Neue", Arial, system-ui, sans-serif;
+    --mono: "JetBrains Mono", "SFMono-Regular", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #0F1120;
+      --surface: #171A2E;
+      --surface-2: #1F2340;
+      --ink: #E8EAF6;
+      --ink-2: #B7BBD3;
+      --ink-3: #8A8FAB;
+      --line: #2C3050;
+      --accent: #8B9BFF;
+      --accent-ink: #A9B5FF;
+      --accent-soft: #262F5E;
+      --good: #35D6BF;
+      --good-soft: #113C36;
+      --bad: #FF847C;
+      --bad-soft: #4A201D;
+      --judge: #FFB84D;
+      --judge-soft: #4A3610;
+      --human: #BC98FF;
+      --human-soft: #34245A;
+      --code-bg: #0B0D1A;
+      --code-ink: #E8EAF6;
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #0F1120;
+    --surface: #171A2E;
+    --surface-2: #1F2340;
+    --ink: #E8EAF6;
+    --ink-2: #B7BBD3;
+    --ink-3: #8A8FAB;
+    --line: #2C3050;
+    --accent: #8B9BFF;
+    --accent-ink: #A9B5FF;
+    --accent-soft: #262F5E;
+    --good: #35D6BF;
+    --good-soft: #113C36;
+    --bad: #FF847C;
+    --bad-soft: #4A201D;
+    --judge: #FFB84D;
+    --judge-soft: #4A3610;
+    --human: #BC98FF;
+    --human-soft: #34245A;
+    --code-bg: #0B0D1A;
+    --code-ink: #E8EAF6;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
+  }
+
+  /* ---------- Base ---------- */
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 17px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3, h4 { font-family: var(--display); line-height: 1.15; text-wrap: balance; margin: 0; }
+  h1 { font-size: clamp(2.2rem, 5vw, 3.6rem); font-weight: 800; letter-spacing: -.02em; }
+  h2 { font-size: clamp(1.6rem, 3vw, 2.2rem); font-weight: 800; letter-spacing: -.015em; }
+  h3 { font-size: 1.25rem; font-weight: 700; margin-top: 1.6rem; }
+  h4 { font-size: 1.05rem; font-weight: 700; }
+  p { margin: .8rem 0; max-width: 68ch; }
+  ul, ol { max-width: 68ch; padding-left: 1.3rem; }
+  li { margin: .35rem 0; }
+  a { color: var(--accent-ink); }
+  strong { font-weight: 700; }
+  code { font-family: var(--mono); font-size: .88em; background: var(--surface-2); padding: .1em .4em; border-radius: 6px; }
+  pre { background: var(--code-bg); color: var(--code-ink); padding: 1.1rem 1.2rem; border-radius: var(--radius); overflow-x: auto; font-family: var(--mono); font-size: .86rem; line-height: 1.55; margin: 1rem 0; }
+  pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
+  .cm { color: #9BA3D6; }
+  .kw { color: #FFB84D; }
+  .st { color: #7FE3D0; }
+  .fn { color: #B4C1FF; }
+  button { font: inherit; }
+  :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+  /* ---------- Progress bar ---------- */
+  .progress { position: fixed; top: env(safe-area-inset-top, 0px); left: 0; height: 4px; width: 0%; background: var(--accent); z-index: 50; transition: width .15s linear; }
+
+  /* ---------- Layout ---------- */
+  .page { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; max-width: 1240px; margin: 0 auto; padding-inline: 16px; }
+  .toc { min-width: 0; position: sticky; top: env(safe-area-inset-top, 0px); z-index: 40; background: var(--bg); padding-block: 10px; border-bottom: 1px solid var(--line); }
+  .toc-inner { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: thin; padding-bottom: 4px; }
+  .toc-inner a { flex: 0 0 auto; text-decoration: none; color: var(--ink-2); font-size: .82rem; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); white-space: nowrap; font-family: var(--display); font-weight: 500; }
+  .toc-inner a.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .toc-inner a .n { opacity: .6; margin-right: 4px; }
+  main { padding-block: 24px 80px; min-width: 0; }
+  @media (min-width: 1000px) {
+    .page { grid-template-columns: 250px minmax(0, 1fr); gap: 48px; }
+    .toc { align-self: start; top: calc(env(safe-area-inset-top, 0px) + 24px); border-bottom: 0; padding-block: 0; margin-top: 28px; }
+    .toc-inner { flex-direction: column; gap: 2px; overflow: visible; }
+    .toc-inner a { background: none; border: 0; border-left: 3px solid transparent; border-radius: 0; padding: 7px 12px; white-space: normal; }
+    .toc-inner a.active { background: var(--accent-soft); color: var(--accent-ink); border-left-color: var(--accent); }
+  }
+
+  /* ---------- Header ---------- */
+  .hero { padding-block: 24px 12px; }
+  .eyebrow { font-family: var(--display); text-transform: uppercase; letter-spacing: .14em; font-size: .72rem; color: var(--accent-ink); font-weight: 700; }
+  .hero .lead { font-size: 1.15rem; color: var(--ink-2); max-width: 62ch; }
+  .topbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding-block: 12px; border-bottom: 1px solid var(--line); }
+  .brand { font-family: var(--display); font-weight: 800; letter-spacing: -.01em; }
+  .theme-btn { border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 999px; padding: 6px 14px; cursor: pointer; font-size: .85rem; }
+  .theme-btn:hover { border-color: var(--accent); }
+
+  /* Learning path stepper */
+  .path { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-block: 20px 8px; }
+  .path a { text-decoration: none; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: block; transition: transform .15s ease, border-color .15s ease; }
+  .path a:hover { transform: translateY(-2px); border-color: var(--accent); }
+  .path .step { font-family: var(--mono); font-size: .7rem; color: var(--accent-ink); font-weight: 600; }
+  .path .name { font-family: var(--display); font-weight: 700; font-size: .95rem; display: block; margin-top: 2px; }
+
+  /* ---------- Chapters ---------- */
+  .chapter { padding-block: 44px 8px; border-top: 1px solid var(--line); margin-top: 32px; scroll-margin-top: 80px; }
+  .chapter:first-of-type { border-top: 0; margin-top: 0; }
+  .chapter-head { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+  .chapter .goal { color: var(--ink-2); font-size: 1.05rem; max-width: 66ch; }
+
+  /* Boxes */
+  .box { border-radius: var(--radius); padding: 16px 18px; margin: 18px 0; max-width: 78ch; border: 1px solid var(--line); background: var(--surface); }
+  .box p:first-of-type { margin-top: .3rem; }
+  .box p:last-child { margin-bottom: .2rem; }
+  .box .label { font-family: var(--display); text-transform: uppercase; letter-spacing: .12em; font-size: .7rem; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; }
+  .analogy { background: var(--judge-soft); border-color: transparent; }
+  .analogy .label { color: var(--judge); }
+  .key { background: var(--accent-soft); border-color: transparent; }
+  .key .label { color: var(--accent-ink); }
+  .doubt { background: var(--surface); border-left: 4px solid var(--human); }
+  .doubt .label { color: var(--human); }
+  .warn { background: var(--bad-soft); border-color: transparent; }
+  .warn .label { color: var(--bad); }
+  .tip { background: var(--good-soft); border-color: transparent; }
+  .tip .label { color: var(--good); }
+
+  details.deeper { border: 1px dashed var(--line); border-radius: var(--radius); padding: 0 18px; margin: 18px 0; max-width: 78ch; background: var(--surface); }
+  details.deeper summary { cursor: pointer; padding: 14px 0; font-family: var(--display); font-weight: 700; color: var(--accent-ink); list-style: none; display: flex; align-items: center; gap: 10px; }
+  details.deeper summary::-webkit-details-marker { display: none; }
+  details.deeper summary::before { content: "+"; display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--accent-soft); font-size: 1rem; }
+  details.deeper[open] summary::before { content: "–"; }
+  details.deeper > :not(summary) { margin-bottom: 14px; }
+
+  /* Cards */
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin: 16px 0; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .card h4 { margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
+  .card p { font-size: .93rem; color: var(--ink-2); margin: .3rem 0; }
+  .card .ex { font-family: var(--mono); font-size: .78rem; color: var(--ink-3); }
+  .chip { display: inline-block; font-family: var(--display); font-size: .7rem; font-weight: 700; letter-spacing: .04em; padding: 2px 8px; border-radius: 999px; background: var(--surface-2); color: var(--ink-2); }
+  .chip.good { background: var(--good-soft); color: var(--good); }
+  .chip.bad { background: var(--bad-soft); color: var(--bad); }
+  .chip.judge { background: var(--judge-soft); color: var(--judge); }
+  .chip.accent { background: var(--accent-soft); color: var(--accent-ink); }
+  .chip.human { background: var(--human-soft); color: var(--human); }
+
+  /* Diagrams */
+  .diagram { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; margin: 18px 0; overflow-x: auto; }
+  .diagram svg { display: block; min-width: 640px; width: 100%; height: auto; }
+  .diagram.narrow svg { min-width: 0; max-width: 560px; margin: 0 auto; }
+  .diagram .cap { font-size: .85rem; color: var(--ink-3); margin: 10px 4px 0; max-width: none; }
+  .svg-text { font-family: var(--display); font-weight: 700; fill: var(--ink); }
+  .svg-sub { font-family: var(--mono); font-size: 11px; fill: var(--ink-3); }
+  .svg-box { fill: var(--surface-2); stroke: var(--line); }
+  .svg-line { stroke: var(--ink-3); fill: none; }
+
+  /* Exam mapping */
+  .mapping { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin: 16px 0; }
+  .map { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; text-align: center; }
+  .map .from { font-family: var(--display); font-weight: 700; font-size: 1rem; }
+  .map .eq { color: var(--ink-3); font-size: .8rem; margin: 4px 0; }
+  .map .to { display: inline-block; background: var(--accent-soft); color: var(--accent-ink); font-family: var(--display); font-weight: 700; padding: 3px 10px; border-radius: 999px; font-size: .9rem; }
+  .map .icon { font-size: 1.6rem; line-height: 1; }
+
+  /* Compare two columns */
+  .vs { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin: 16px 0; max-width: 80ch; }
+  .vs > div { border-radius: 12px; padding: 14px 16px; }
+  .vs .l { background: var(--bad-soft); }
+  .vs .r { background: var(--good-soft); }
+  .vs h4 { margin-bottom: 6px; }
+  .vs ul { padding-left: 1.1rem; margin: 0; font-size: .95rem; }
+
+  /* Spectrum */
+  .spectrum { margin: 20px 0; }
+  .spectrum .bar { height: 12px; border-radius: 999px; background: linear-gradient(90deg, var(--good), var(--accent), var(--human)); }
+  .spectrum .ends { display: flex; justify-content: space-between; font-family: var(--display); font-weight: 700; font-size: .85rem; margin-top: 6px; }
+  .spectrum .items { display: flex; justify-content: space-between; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .spectrum .items span { font-size: .8rem; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; }
+
+  /* Ladder of graders */
+  .ladder { display: grid; gap: 10px; margin: 16px 0; }
+  .rung { display: grid; grid-template-columns: 44px 1fr; gap: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; align-items: start; }
+  .rung .num { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; font-family: var(--display); font-weight: 800; color: #fff; background: var(--accent); }
+  .rung h4 { margin-bottom: 2px; }
+  .rung p { font-size: .95rem; margin: .3rem 0; }
+  .rung .meters { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 8px; font-size: .75rem; color: var(--ink-3); font-family: var(--display); font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
+  .meter { display: inline-flex; align-items: center; gap: 6px; }
+  .meter i { display: inline-block; width: 70px; height: 6px; border-radius: 999px; background: var(--surface-2); position: relative; overflow: hidden; }
+  .meter i::after { content: ""; position: absolute; inset: 0; width: var(--v); background: var(--accent); border-radius: 999px; }
+  .meter.cost i::after { background: var(--judge); }
+
+  /* Tables */
+  .tbl { overflow-x: auto; margin: 16px 0; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: .93rem; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-family: var(--display); font-weight: 700; background: var(--surface-2); font-size: .82rem; text-transform: uppercase; letter-spacing: .06em; }
+  tr:last-child td { border-bottom: 0; }
+  td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+  /* Playground */
+  .play { background: var(--surface); border: 2px solid var(--accent-soft); border-radius: var(--radius); padding: 18px; margin: 20px 0; }
+  .play .label { color: var(--accent-ink); }
+  .play h4 { margin: 6px 0 10px; }
+  .field { display: grid; gap: 4px; margin: 10px 0; }
+  .field label { font-size: .82rem; font-family: var(--display); font-weight: 700; color: var(--ink-2); }
+  .field input, .field textarea { font: inherit; font-size: .95rem; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); width: 100%; }
+  .field input:focus, .field textarea:focus { border-color: var(--accent); }
+  .results { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-top: 12px; }
+  .res { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--bg); }
+  .res .name { font-family: var(--display); font-weight: 700; font-size: .85rem; }
+  .res .val { font-family: var(--mono); font-size: 1.3rem; font-weight: 600; font-variant-numeric: tabular-nums; margin: 4px 0; }
+  .res .why { font-size: .78rem; color: var(--ink-3); }
+  .res.pass .val { color: var(--good); }
+  .res.fail .val { color: var(--bad); }
+  .grid4 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; max-width: 420px; }
+  .grid4 .field { margin: 0; }
+  .btn { background: var(--accent); color: #fff; border: 0; border-radius: 10px; padding: 9px 16px; font-family: var(--display); font-weight: 700; cursor: pointer; }
+  .btn.ghost { background: var(--surface-2); color: var(--ink); }
+  .btn:hover { filter: brightness(1.08); }
+
+  /* Confusion matrix visual */
+  .cm-grid { display: grid; grid-template-columns: 90px 1fr 1fr; gap: 6px; max-width: 460px; margin-top: 12px; font-size: .85rem; }
+  .cm-grid .h { font-family: var(--display); font-weight: 700; color: var(--ink-2); display: grid; place-items: center; text-align: center; }
+  .cm-grid .cell { border-radius: 10px; padding: 10px; text-align: center; }
+  .cm-grid .cell b { display: block; font-family: var(--mono); font-size: 1.2rem; }
+  .cm-grid .tp { background: var(--good-soft); color: var(--good); }
+  .cm-grid .tn { background: var(--good-soft); color: var(--good); }
+  .cm-grid .fp { background: var(--bad-soft); color: var(--bad); }
+  .cm-grid .fn { background: var(--bad-soft); color: var(--bad); }
+
+  /* Judge demo */
+  .judge-demo { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-top: 10px; }
+  .answer { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; background: var(--bg); font-size: .92rem; transition: transform .35s ease; }
+  .answer .tag { font-family: var(--display); font-weight: 800; color: var(--accent-ink); }
+  .verdict { margin-top: 12px; padding: 12px 14px; border-radius: 10px; background: var(--judge-soft); color: var(--judge); font-family: var(--display); font-weight: 700; }
+
+  /* Quiz */
+  .quiz { display: grid; gap: 14px; }
+  .q { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .q .qt { font-weight: 700; margin-bottom: 8px; }
+  .q .opts { display: grid; gap: 6px; }
+  .q .opts button { text-align: left; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; cursor: pointer; color: var(--ink); font-size: .93rem; }
+  .q .opts button:hover { border-color: var(--accent); }
+  .q .opts button.right { background: var(--good-soft); border-color: var(--good); }
+  .q .opts button.wrong { background: var(--bad-soft); border-color: var(--bad); }
+  .q .exp { font-size: .9rem; color: var(--ink-2); margin-top: 8px; }
+  .q .exp:empty { display: none; }
+
+  /* Glossary */
+  dl.gloss { display: grid; grid-template-columns: 1fr; gap: 6px 16px; max-width: 80ch; }
+  dl.gloss dt { font-family: var(--display); font-weight: 700; margin-top: 8px; }
+  dl.gloss dd { margin: 0; color: var(--ink-2); font-size: .95rem; }
+  @media (min-width: 700px) { dl.gloss { grid-template-columns: 200px 1fr; } dl.gloss dt { margin-top: 0; } }
+
+  /* Motion */
+  .pulse { animation: pulse 2.4s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { opacity: .55; } 50% { opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    .pulse { animation: none; }
+    .path a, .answer { transition: none; }
+  }
+  .footer { color: var(--ink-3); font-size: .85rem; padding-top: 24px; border-top: 1px solid var(--line); margin-top: 40px; }
+</style>
+<style>
+  /* ---------- Series navigation (shared across all guides) ---------- */
+  .series { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: .82rem; color: var(--ink-3); }
+  .series a { color: var(--accent-ink); text-decoration: none; font-family: var(--display); font-weight: 700; }
+  .series a:hover { text-decoration: underline; }
+  .series .part { font-family: var(--mono); font-size: .72rem; background: var(--accent-soft); color: var(--accent-ink); padding: 2px 8px; border-radius: 999px; }
+  .pager { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 32px; }
+  .pager a { flex: 1 1 220px; text-decoration: none; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .pager a:hover { border-color: var(--accent); }
+  .pager a .dir { font-family: var(--mono); font-size: .7rem; color: var(--ink-3); text-transform: uppercase; letter-spacing: .08em; display: block; }
+  .pager a .t { font-family: var(--display); font-weight: 700; }
+  .pager a.next { text-align: right; }
+  /* Glossary term highlight in prose */
+  .term { border-bottom: 2px dotted var(--accent); cursor: help; }
+  /* Callout list inside cards */
+  .card ul, .card ol { padding-left: 1.1rem; margin: .3rem 0; font-size: .92rem; color: var(--ink-2); }
+  /* Slider fields */
+  .field input[type="range"] { padding: 0; height: 28px; accent-color: var(--accent); }
+  .field .val { font-family: var(--mono); font-size: .85rem; color: var(--accent-ink); }
+  /* Simple flow row diagram (HTML-based, wraps on phones) */
+  .flow { display: flex; align-items: stretch; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
+  .flow .node { flex: 1 1 140px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; min-width: 0; }
+  .flow .node h4 { margin: 0 0 4px; font-size: .95rem; }
+  .flow .node p { font-size: .85rem; color: var(--ink-2); margin: 0; }
+  .flow .node.hot { border-color: var(--accent); background: var(--accent-soft); }
+  .flow .arrow { align-self: center; color: var(--ink-3); font-size: 1.2rem; }
+  /* Chat message mock */
+  .chat { display: grid; gap: 8px; margin: 14px 0; max-width: 70ch; }
+  .msg { border-radius: 12px; padding: 10px 14px; font-size: .93rem; border: 1px solid var(--line); background: var(--surface); }
+  .msg .who { font-family: var(--display); font-weight: 700; font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; display: block; margin-bottom: 2px; }
+  .msg.system { background: var(--surface-2); }
+  .msg.system .who { color: var(--ink-3); }
+  .msg.user { background: var(--accent-soft); border-color: transparent; }
+  .msg.user .who { color: var(--accent-ink); }
+  .msg.assistant { background: var(--good-soft); border-color: transparent; }
+  .msg.assistant .who { color: var(--good); }
+  .msg.tool { background: var(--judge-soft); border-color: transparent; font-family: var(--mono); font-size: .82rem; }
+  .msg.tool .who { color: var(--judge); font-family: var(--display); }
+  .msg.danger { background: var(--bad-soft); border-color: transparent; }
+  .msg.danger .who { color: var(--bad); }
+  /* Bars for probability / comparison demos */
+  .bars { display: grid; gap: 6px; margin-top: 10px; }
+  .bar-row { display: grid; grid-template-columns: 110px 1fr 56px; gap: 8px; align-items: center; font-size: .85rem; }
+  .bar-row .lbl { font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bar-row .track { height: 14px; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
+  .bar-row .fill { height: 100%; background: var(--accent); border-radius: 999px; transition: width .25s ease; }
+  .bar-row .pct { font-family: var(--mono); text-align: right; font-variant-numeric: tabular-nums; }
+  /* Comparison table highlight */
+  td.yes { color: var(--good); font-weight: 700; }
+  td.no { color: var(--bad); font-weight: 700; }
+  td.mid { color: var(--judge); font-weight: 700; }
+</style>
+</head>
+<body>
+<div class="progress" id="progress"></div>
+
+<div class="page">
+  <aside class="toc" aria-label="Chapters">
+    <nav class="toc-inner" id="toc">
+      <a href="#c0"><span class="n">0</span>What fine-tuning is</a>
+      <a href="#c1"><span class="n">1</span>Prompt, RAG or tune?</a>
+      <a href="#c2"><span class="n">2</span>Four kinds</a>
+      <a href="#c3"><span class="n">3</span>Full vs LoRA</a>
+      <a href="#c4"><span class="n">4</span>The data</a>
+      <a href="#c5"><span class="n">5</span>Training loop</a>
+      <a href="#c6"><span class="n">6</span>Checking the result</a>
+      <a href="#c7"><span class="n">7</span>Serving it</a>
+      <a href="#c8"><span class="n">8</span>Cost and worth</a>
+      <a href="#c9"><span class="n">9</span>Quiz &amp; glossary</a>
+    </nav>
+  </aside>
+
+  <main>
+    <div class="topbar">
+      <div class="series"><a href="index.html">LLM Study Guides</a><span class="part">Part 6 of 8</span><span>Fine-Tuning</span></div>
+      <button class="theme-btn" id="themeBtn" type="button" aria-label="Toggle dark mode">Toggle theme</button>
+    </div>
+
+    <header class="hero">
+      <div class="eyebrow">Part 6 · Training a model on your own data, step by step</div>
+      <h1>When should I train a model on my own data, and how?</h1>
+      <p class="lead">By the end of this guide you will be able to decide whether a problem calls for a better prompt, retrieval, or fine-tuning; build and inspect a training set; read a loss curve and know when to stop; and prove with an eval that the fine-tune was worth it. Each chapter builds on the one before, so read in order and play with the two interactive boxes.</p>
+      <div class="path">
+        <a href="#c0"><span class="step">STEP 0</span><span class="name">What fine-tuning is</span></a>
+        <a href="#c1"><span class="step">STEP 1</span><span class="name">Prompt, RAG or tune?</span></a>
+        <a href="#c2"><span class="step">STEP 2</span><span class="name">Four kinds</span></a>
+        <a href="#c3"><span class="step">STEP 3</span><span class="name">Full vs LoRA</span></a>
+        <a href="#c4"><span class="step">STEP 4</span><span class="name">The data</span></a>
+        <a href="#c5"><span class="step">STEP 5</span><span class="name">Training loop</span></a>
+        <a href="#c6"><span class="step">STEP 6</span><span class="name">Checking the result</span></a>
+        <a href="#c7"><span class="step">STEP 7</span><span class="name">Serving it</span></a>
+        <a href="#c8"><span class="step">STEP 8</span><span class="name">Cost and worth</span></a>
+        <a href="#c9"><span class="step">STEP 9</span><span class="name">Quiz &amp; glossary</span></a>
+      </div>
+    </header>
+
+    <!-- ===================== CHAPTER 0 ===================== -->
+    <section class="chapter" id="c0">
+      <div class="chapter-head">
+        <div class="eyebrow">Step 0 · 3 minutes</div>
+        <h2>What fine-tuning is, in one sentence</h2>
+        <p class="goal">One definition, one analogy, and the single most important thing fine-tuning does not do.</p>
+      </div>
+
+      <p><strong>Fine-tuning</strong> means taking a model that has already been trained and continuing its training on your own examples, so that its behaviour shifts toward those examples.</p>
+      <p>Every large language model starts with <strong>pre-training</strong>: it reads an enormous pile of text and learns to predict the next word, over and over, for weeks on thousands of chips. The result is called the <strong>base model</strong>. Everything the model "knows" is stored in its <strong>weights</strong> (also called <strong>parameters</strong>): billions of numbers that decide how it turns input text into output text. Fine-tuning nudges those numbers a little, using your examples, so the model's habits change.</p>
+
+      <div class="box analogy">
+        <span class="label">Analogy</span>
+        <p>A fully qualified general doctor starts a specialist residency in dermatology. They do not relearn medicine from scratch. They already know anatomy, chemistry and how to talk to patients. The residency adjusts what they do: how they examine skin, which questions they ask first, how they write up a case. Fine-tuning is that residency. The base model is the general doctor.</p>
+      </div>
+
+      <div class="flow" aria-label="Base model plus your examples gives a fine-tuned model">
+        <div class="node"><h4>Base model</h4><p>General ability, learned in pre-training from public text.</p></div>
+        <div class="arrow">+</div>
+        <div class="node hot"><h4>Your examples</h4><p>Hundreds or thousands of "input, ideal output" pairs.</p></div>
+        <div class="arrow">&rarr;</div>
+        <div class="node"><h4>Fine-tuned model</h4><p>Same general ability, new habits: your format, your tone, your task.</p></div>
+      </div>
+
+      <h3>What fine-tuning changes, and what it does not</h3>
+      <div class="vs">
+        <div class="r"><h4>Changes reliably</h4><ul><li>Style and tone (formal, terse, friendly)</li><li>Output format (always valid JSON, always three bullet points)</li><li>Task habits (always ask for the order number first)</li><li>Which of several possible behaviours the model prefers</li></ul></div>
+        <div class="l"><h4>Does not change reliably</h4><ul><li>Facts. A few hundred examples do not turn a model into a database.</li><li>Knowledge of things that happened after pre-training</li><li>Anything private to one user or one request</li><li>Deep reasoning ability (it can be sharpened, not created)</li></ul></div>
+      </div>
+
+      <div class="box key">
+        <span class="label">Key idea</span>
+        <p>Fine-tuning teaches <em>how to answer</em>, not <em>what is true</em>. If your problem is "the model does not know my company's return policy", the fix is usually retrieval (Part 3), not training. If your problem is "the model knows enough but keeps answering in the wrong shape", fine-tuning is the right tool.</p>
+      </div>
+
+      <div class="box doubt">
+        <span class="label">Common doubt</span>
+        <p><strong>"So does the fine-tuned model forget what it learned in pre-training?"</strong> Mostly no, if you do it carefully. The nudges are small compared with the original training. But it is possible to push too hard and damage general ability. Step 6 shows how to check for that.</p>
+      </div>
+    </section>
+
+    <!-- ===================== CHAPTER 1 ===================== -->
+    <section class="chapter" id="c1">
+      <div class="chapter-head">
+        <div class="eyebrow">Step 1 · The decision</div>
+        <h2>Prompting, RAG, or fine-tuning?</h2>
+        <p class="goal">Three ways to change a model's behaviour. Learn which to reach for first and why fine-tuning is the last one, not the first.</p>
+      </div>
+
+      <p>When a model does not behave the way you want, you have three levers. <strong>Prompting</strong> means changing the instructions and examples you send with each request (Part 2). <strong>RAG</strong> (retrieval-augmented generation) means looking up relevant documents at request time and pasting them into the prompt so the model can read them (Part 3). Fine-tuning means changing the model itself.</p>
+
+      <div class="tbl">
+        <table>
+          <thead><tr><th>Lever</th><th>Good for</th><th>Cost</th><th>Time to change</th><th>Main risk</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Prompting</strong></td><td>Instructions, a few examples, tone, simple formats</td><td>Almost free</td><td>Seconds. Edit text, retry.</td><td>Long prompts are re-sent (and billed, per token, the word-pieces a model reads) on every call; brittle for complex formats</td></tr>
+            <tr><td><strong>RAG</strong></td><td>Facts that change, private documents, citing sources</td><td>Building a search index; extra tokens per call</td><td>Minutes. Update the documents.</td><td>Retrieval returns the wrong passage; the model ignores it</td></tr>
+            <tr><td><strong>Fine-tuning</strong></td><td>Consistent style and format at scale; teaching a small model a narrow task; cutting prompt length</td><td>Data work, training runs, sometimes hardware</td><td>Hours to days. Retrain and re-check.</td><td>Overfitting, forgetting, stale behaviour baked in</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="diagram">
+        <svg viewBox="0 0 1000 280" role="img" aria-label="Decision flow: try prompting, then RAG for facts, then fine-tuning for style and scale">
+          <defs><marker id="arrA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--ink-3)"></path></marker></defs>
+          <!-- top row -->
+          <rect x="20" y="40" width="150" height="60" rx="12" fill="var(--accent)"></rect>
+          <text x="95" y="65" text-anchor="middle" font-family="var(--display)" font-weight="700" font-size="13" fill="#fff">Try prompting</text>
+          <text x="95" y="83" text-anchor="middle" font-family="var(--display)" font-weight="700" font-size="13" fill="#fff">first</text>
+
+          <rect x="220" y="40" width="150" height="60" rx="12" class="svg-box"></rect>
+          <text x="295" y="74" text-anchor="middle" class="svg-text" font-size="13">Good enough?</text>
+
+          <rect x="420" y="40" width="170" height="60" rx="12" class="svg-box"></rect>
+          <text x="505" y="65" text-anchor="middle" class="svg-text" font-size="13">Needs private or</text>
+          <text x="505" y="83" text-anchor="middle" class="svg-text" font-size="13">fresh facts?</text>
+
+          <rect x="640" y="40" width="180" height="60" rx="12" class="svg-box"></rect>
+          <text x="730" y="59" text-anchor="middle" class="svg-text" font-size="12">Needs a fixed style or</text>
+          <text x="730" y="75" text-anchor="middle" class="svg-text" font-size="12">format at scale, or a</text>
+          <text x="730" y="91" text-anchor="middle" class="svg-text" font-size="12">smaller, cheaper model?</text>
+
+          <rect x="860" y="40" width="130" height="60" rx="12" class="svg-box"></rect>
+          <text x="925" y="65" text-anchor="middle" class="svg-text" font-size="12">Keep improving</text>
+          <text x="925" y="83" text-anchor="middle" class="svg-text" font-size="12">the prompt</text>
+
+          <!-- horizontal arrows with "no" labels -->
+          <path d="M170 70 H218" class="svg-line" stroke-width="2" marker-end="url(#arrA)"></path>
+          <path d="M370 70 H418" class="svg-line" stroke-width="2" marker-end="url(#arrA)"></path>
+          <text x="394" y="60" text-anchor="middle" class="svg-sub">no</text>
+          <path d="M590 70 H638" class="svg-line" stroke-width="2" marker-end="url(#arrA)"></path>
+          <text x="614" y="60" text-anchor="middle" class="svg-sub">no</text>
+          <path d="M820 70 H858" class="svg-line" stroke-width="2" marker-end="url(#arrA)"></path>
+          <text x="839" y="60" text-anchor="middle" class="svg-sub">no</text>
+
+          <!-- down arrows with "yes" labels -->
+          <path d="M295 100 V178" class="svg-line" stroke-width="2" marker-end="url(#arrA)"></path>
+          <text x="305" y="145" class="svg-sub">yes</text>
+          <path d="M505 100 V178" class="svg-line" stroke-width="2" marker-end="url(#arrA)"></path>
+          <text x="515" y="145" class="svg-sub">yes</text>
+          <path d="M730 100 V178" class="svg-line" stroke-width="2" marker-end="url(#arrA)"></path>
+          <text x="740" y="145" class="svg-sub">yes</text>
+
+          <!-- outcomes -->
+          <rect x="220" y="180" width="150" height="60" rx="12" fill="var(--good)"></rect>
+          <text x="295" y="215" text-anchor="middle" font-family="var(--display)" font-weight="700" font-size="14" fill="#fff">Ship it</text>
+
+          <rect x="420" y="180" width="170" height="60" rx="12" fill="var(--judge)"></rect>
+          <text x="505" y="206" text-anchor="middle" font-family="var(--display)" font-weight="700" font-size="14" fill="#fff">Add RAG</text>
+          <text x="505" y="226" text-anchor="middle" font-family="var(--display)" font-size="12" fill="#fff">(Part 3)</text>
+
+          <rect x="640" y="180" width="180" height="60" rx="12" fill="var(--accent)"></rect>
+          <text x="730" y="206" text-anchor="middle" font-family="var(--display)" font-weight="700" font-size="14" fill="#fff">Fine-tune</text>
+          <text x="730" y="226" text-anchor="middle" font-family="var(--display)" font-size="12" fill="#fff">(this guide)</text>
+
+          <text x="20" y="266" class="svg-sub">The moving dot follows the path of a team that needs the same output format on a million requests a day.</text>
+
+          <circle r="7" fill="var(--human)" stroke="var(--surface)" stroke-width="2">
+            <animateMotion dur="8s" repeatCount="indefinite" path="M95 70 H295 H505 H730 V210" keyPoints="0;0.26;0.26;0.53;0.53;0.82;0.82;1;1" keyTimes="0;0.18;0.28;0.46;0.56;0.74;0.82;0.95;1" calcMode="linear"></animateMotion>
+          </circle>
+        </svg>
+        <p class="cap">The order matters. Prompting is cheap to try and cheap to undo. RAG solves knowledge problems. Fine-tuning solves behaviour problems that prompting cannot fix, or that are too expensive to fix with a long prompt on every call.</p>
+      </div>
+
+      <div class="box doubt">
+        <span class="label">Common doubt</span>
+        <p><strong>"Will fine-tuning teach the model my company's facts?"</strong> Mostly no. A few hundred examples can teach the model to <em>sound</em> like it knows your policies, which is worse than not knowing, because it will confidently make them up. To give a model facts, put the facts in the prompt at request time, which is exactly what RAG does. Fine-tuning and RAG combine well: RAG supplies the facts, fine-tuning supplies the manners.</p>
+      </div>
+
+      <div class="box key">
+        <span class="label">Key idea</span>
+        <p>Reach for the levers in order: prompt, then retrieve, then train. Each step costs more and is harder to undo than the one before. Fine-tuning is worth it when the cheaper levers have been tried honestly and fallen short.</p>
+      </div>
+
+      <details class="deeper">
+        <summary>Go deeper: the "long prompt tax"</summary>
+        <p>Suppose your prompt needs twelve worked examples to get the format right, and you handle two million requests a month. Those examples are sent, and paid for, on every single call. A fine-tuned model that has absorbed the format needs a prompt one tenth the size. At high volume, the training cost pays for itself in saved tokens and faster responses. At low volume it never does. This arithmetic is the most common good reason to fine-tune.</p>
+      </details>
+    </section>
+
+    <!-- ===================== CHAPTER 2 ===================== -->
+    <section class="chapter" id="c2">
+      <div class="chapter-head">
+        <div class="eyebrow">Step 2 · The menu</div>
+        <h2>Four kinds of fine-tuning</h2>
+        <p class="goal">"Fine-tuning" is a family, not one technique. Each member needs a different kind of data and changes a different thing.</p>
+      </div>
+
+      <div class="cards">
+        <div class="card"><h4>Supervised fine-tuning <span class="chip accent">SFT</span></h4><p>You show the model pairs of "input, ideal output". It learns to produce outputs like yours. This is what most people mean by fine-tuning, and it is where beginners should start.</p><p class="ex">data: prompt &rarr; ideal answer</p></div>
+        <div class="card"><h4>Preference tuning <span class="chip human">DPO / RLHF</span></h4><p>You show the model two answers to the same input and mark which is better. It learns your taste, not just your format. Used after SFT to polish judgement: politeness, safety, brevity.</p><p class="ex">data: prompt, better answer, worse answer</p></div>
+        <div class="card"><h4>Continued pre-training <span class="chip judge">rare</span></h4><p>You feed the model a large pile of raw text from your field (medical notes, legal filings, a programming language) with no question-and-answer structure. It soaks up vocabulary and some knowledge. Expensive and easy to get wrong.</p><p class="ex">data: millions of words of raw text</p></div>
+        <div class="card"><h4>Distillation <span class="chip good">cheaper</span></h4><p>A big <strong>teacher model</strong> writes answers to many inputs. A small <strong>student model</strong> is fine-tuned on those answers. The student ends up nearly as good on that narrow task, but much faster and cheaper to run.</p><p class="ex">data: teacher's answers, used as SFT pairs</p></div>
+      </div>
+
+      <div class="diagram">
+        <svg viewBox="0 0 920 300" role="img" aria-label="The four kinds of fine-tuning and the data each one needs">
+          <!-- column 1: SFT -->
+          <rect x="20" y="20" width="205" height="44" rx="10" fill="var(--accent)"></rect>
+          <text x="122" y="47" text-anchor="middle" font-family="var(--display)" font-weight="700" font-size="14" fill="#fff">Supervised (SFT)</text>
+          <rect x="20" y="84" width="205" height="130" rx="10" class="svg-box"></rect>
+          <text x="34" y="108" font-family="var(--mono)" font-size="11" fill="var(--ink-2)">prompt: "Where is my order?"</text>
+          <text x="34" y="126" font-family="var(--mono)" font-size="11" fill="var(--good)">ideal: "Please share your..."</text>
+          <text x="34" y="152" font-family="var(--mono)" font-size="11" fill="var(--ink-2)">prompt: "Cancel my plan."</text>
+          <text x="34" y="170" font-family="var(--mono)" font-size="11" fill="var(--good)">ideal: "I can help with..."</text>
+          <text x="34" y="198" font-family="var(--mono)" font-size="11" fill="var(--ink-3)">... hundreds more pairs</text>
+          <text x="122" y="244" text-anchor="middle" class="svg-text" font-size="12">Changes: format, habits</text>
+          <text x="122" y="264" text-anchor="middle" class="svg-sub">needs: 100s to 1000s of pairs</text>
+
+          <!-- column 2: preference -->
+          <rect x="245" y="20" width="205" height="44" rx="10" fill="var(--human)"></rect>
+          <text x="347" y="47" text-anchor="middle" font-family="var(--display)" font-weight="700" font-size="14" fill="#fff">Preference (DPO)</text>
+          <rect x="245" y="84" width="205" height="130" rx="10" class="svg-box"></rect>
+          <text x="259" y="108" font-family="var(--mono)" font-size="11" fill="var(--ink-2)">prompt: "Where is my order?"</text>
+          <rect x="259" y="118" width="177" height="20" rx="5" fill="var(--good-soft)"></rect>
+          <text x="267" y="132" font-family="var(--mono)" font-size="11" fill="var(--good)">A: short, asks order no.</text>
+          <rect x="259" y="144" width="177" height="20" rx="5" fill="var(--bad-soft)"></rect>
+          <text x="267" y="158" font-family="var(--mono)" font-size="11" fill="var(--bad)">B: long, guesses cause</text>
+          <text x="259" y="184" font-family="var(--mono)" font-size="11" fill="var(--ink-2)">label: A is better</text>
+          <text x="259" y="202" font-family="var(--mono)" font-size="11" fill="var(--ink-3)">... hundreds more pairs</text>
+          <text x="347" y="244" text-anchor="middle" class="svg-text" font-size="12">Changes: judgement, taste</text>
+          <text x="347" y="264" text-anchor="middle" class="svg-sub">needs: compared answer pairs</text>
+
+          <!-- column 3: continued pre-training -->
+          <rect x="470" y="20" width="205" height="44" rx="10" fill="var(--judge)"></rect>
+          <text x="572" y="47" text-anchor="middle" font-family="var(--display)" font-weight="700" font-size="14" fill="#fff">Continued pre-training</text>
+          <rect x="470" y="84" width="205" height="130" rx="10" class="svg-box"></rect>
+          <rect x="484" y="98" width="177" height="8" rx="4" fill="var(--line)"></rect>
+          <rect x="484" y="112" width="160" height="8" rx="4" fill="var(--line)"></rect>
+          <rect x="484" y="126" width="170" height="8" rx="4" fill="var(--line)"></rect>
+          <rect x="484" y="140" width="140" height="8" rx="4" fill="var(--line)"></rect>
+          <rect x="484" y="154" width="177" height="8" rx="4" fill="var(--line)"></rect>
+          <rect x="484" y="168" width="150" height="8" rx="4" fill="var(--line)"></rect>
+          <text x="484" y="200" font-family="var(--mono)" font-size="11" fill="var(--ink-3)">raw text, no Q and A shape</text>
+          <text x="572" y="244" text-anchor="middle" class="svg-text" font-size="12">Changes: vocabulary, some facts</text>
+          <text x="572" y="264" text-anchor="middle" class="svg-sub">needs: millions of words</text>
+
+          <!-- column 4: distillation -->
+          <rect x="695" y="20" width="205" height="44" rx="10" fill="var(--good)"></rect>
+          <text x="797" y="47" text-anchor="middle" font-family="var(--display)" font-weight="700" font-size="14" fill="#fff">Distillation</text>
+          <rect x="695" y="84" width="205" height="130" rx="10" class="svg-box"></rect>
+          <rect x="709" y="98" width="80" height="50" rx="8" fill="var(--accent)"></rect>
+          <text x="749" y="119" text-anchor="middle" font-family="var(--display)" font-weight="700" font-size="11" fill="#fff">Teacher</text>
+          <text x="749" y="134" text-anchor="middle" font-family="var(--display)" font-size="11" fill="#fff">(big model)</text>
+          <path d="M792 123 H826" class="svg-line" stroke-width="2" marker-end="url(#arrB)"></path>
+          <rect x="830" y="108" width="56" height="30" rx="8" fill="var(--good)"></rect>
+          <text x="858" y="127" text-anchor="middle" font-family="var(--display)" font-weight="700" font-size="11" fill="#fff">Student</text>
+          <text x="709" y="172" font-family="var(--mono)" font-size="11" fill="var(--ink-2)">teacher writes answers,</text>
+          <text x="709" y="188" font-family="var(--mono)" font-size="11" fill="var(--ink-2)">student trains on them (SFT)</text>
+          <text x="797" y="244" text-anchor="middle" class="svg-text" font-size="12">Changes: size, cost, speed</text>
+          <text x="797" y="264" text-anchor="middle" class="svg-sub">needs: a strong teacher</text>
+          <defs><marker id="arrB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--ink-3)"></path></marker></defs>
+        </svg>
+        <p class="cap">Four members of the fine-tuning family. Read the bottom line of each column: the data you need tells you which kind you are doing.</p>
+      </div>
+
+      <div class="box analogy">
+        <span class="label">Analogy</span>
+        <p>Back to the doctor. SFT is watching a senior colleague handle fifty cases and copying their write-ups. Preference tuning is the senior colleague marking your write-ups: "this one is better, that one rambles". Continued pre-training is reading every dermatology textbook for a year. Distillation is the senior colleague writing model answers for a junior nurse to learn from, so the nurse can handle routine cases alone.</p>
+      </div>
+
+      <details class="deeper">
+        <summary>Go deeper: DPO versus RLHF</summary>
+        <p>Both are ways to learn from preferences. <strong>RLHF</strong> (reinforcement learning from human feedback) first trains a separate "reward model" to score answers the way humans would, then trains the language model to chase high scores. It is powerful and fiddly. <strong>DPO</strong> (direct preference optimisation) skips the separate reward model and adjusts the language model directly from the better-versus-worse pairs. It is simpler to run and is the usual choice for small teams. For a beginner the practical difference is: DPO needs only a file of compared pairs; RLHF needs a whole extra training pipeline.</p>
+      </details>
+
+      <div class="box key">
+        <span class="label">Key idea</span>
+        <p>Start with supervised fine-tuning. It needs the simplest data (input and ideal output), it is the best understood, and it covers most real needs. Add preference tuning only when SFT gets the format right but the judgement wrong.</p>
+      </div>
+    </section>
+
+    <!-- ===================== CHAPTER 3 ===================== -->
+    <section class="chapter" id="c3">
+      <div class="chapter-head">
+        <div class="eyebrow">Step 3 · Under the hood</div>
+        <h2>Full fine-tuning versus adapters (LoRA)</h2>
+        <p class="goal">You can move all the weights or just a few. Learn why almost everyone chooses "just a few", and what QLoRA adds.</p>
+      </div>
+
+      <p><strong>Full fine-tuning</strong> updates every one of the model's billions of weights. It is the most flexible option and the most expensive: you need enough <strong>GPU</strong> memory (a GPU is the specialised chip that does the arithmetic of training and running models) to hold the whole model plus all the bookkeeping that training needs, which is several times the model's own size. For a large model that means a rack of high-end chips.</p>
+      <p><strong>Parameter-efficient fine-tuning</strong> (PEFT) is the family of tricks that avoid this. The most popular is <strong>LoRA</strong> (low-rank adaptation). The idea: leave the base model exactly as it is (its weights are <strong>frozen</strong>, meaning they never change during training) and bolt on small trainable side-layers called <strong>adapters</strong>. Only the adapters learn. An adapter is typically well under one percent of the model's size, so training needs far less memory and produces a tiny file you can pass around.</p>
+
+      <div class="box analogy">
+        <span class="label">Analogy</span>
+        <p>Full fine-tuning is rewriting a thick textbook to match your course. LoRA is covering the textbook in sticky notes. The book is untouched, the notes are small, and you can peel them off and stick on a different set for a different course. You can even hand the notes to a friend who owns the same book.</p>
+      </div>
+
+      <div class="diagram">
+        <svg viewBox="0 0 900 290" role="img" aria-label="A frozen base model with small trainable adapters attached on the side">
+          <defs><marker id="arrC" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--ink-3)"></path></marker></defs>
+          <!-- input -->
+          <text x="20" y="140" class="svg-text" font-size="13">Input</text>
+          <path d="M70 136 H108" class="svg-line" stroke-width="2" marker-end="url(#arrC)"></path>
+          <!-- frozen block -->
+          <rect x="110" y="40" width="440" height="200" rx="16" class="svg-box" stroke-width="2" stroke-dasharray="8 5"></rect>
+          <text x="330" y="66" text-anchor="middle" class="svg-text" font-size="14">Base model: billions of weights, frozen</text>
+          <rect x="140" y="86" width="380" height="26" rx="7" fill="var(--surface)" stroke="var(--line)"></rect>
+          <text x="330" y="104" text-anchor="middle" class="svg-sub">layer 1</text>
+          <rect x="140" y="122" width="380" height="26" rx="7" fill="var(--surface)" stroke="var(--line)"></rect>
+          <text x="330" y="140" text-anchor="middle" class="svg-sub">layer 2</text>
+          <rect x="140" y="158" width="380" height="26" rx="7" fill="var(--surface)" stroke="var(--line)"></rect>
+          <text x="330" y="176" text-anchor="middle" class="svg-sub">layer 3</text>
+          <rect x="140" y="194" width="380" height="26" rx="7" fill="var(--surface)" stroke="var(--line)"></rect>
+          <text x="330" y="212" text-anchor="middle" class="svg-sub">... dozens more layers</text>
+          <!-- adapters -->
+          <path d="M520 99 H598" class="svg-line" stroke-width="2" stroke-dasharray="4 3"></path>
+          <path d="M520 135 H598" class="svg-line" stroke-width="2" stroke-dasharray="4 3"></path>
+          <path d="M520 171 H598" class="svg-line" stroke-width="2" stroke-dasharray="4 3"></path>
+          <rect x="600" y="84" width="150" height="30" rx="8" fill="var(--good)"></rect>
+          <text x="675" y="104" text-anchor="middle" font-family="var(--display)" font-weight="700" font-size="12" fill="#fff">adapter (trainable)</text>
+          <rect x="600" y="120" width="150" height="30" rx="8" fill="var(--good)"></rect>
+          <text x="675" y="140" text-anchor="middle" font-family="var(--display)" font-weight="700" font-size="12" fill="#fff">adapter (trainable)</text>
+          <rect x="600" y="156" width="150" height="30" rx="8" fill="var(--good)"></rect>
+          <text x="675" y="176" text-anchor="middle" font-family="var(--display)" font-weight="700" font-size="12" fill="#fff">adapter (trainable)</text>
+          <text x="675" y="210" text-anchor="middle" class="svg-sub">under 1% of weights</text>
+          <!-- swappable sets -->
+          <rect x="780" y="70" width="105" height="34" rx="8" fill="var(--good-soft)" stroke="var(--good)"></rect>
+          <text x="832" y="91" text-anchor="middle" font-family="var(--display)" font-weight="700" font-size="11" fill="var(--good)">support tone</text>
+          <rect x="780" y="112" width="105" height="34" rx="8" fill="var(--judge-soft)" stroke="var(--judge)"></rect>
+          <text x="832" y="133" text-anchor="middle" font-family="var(--display)" font-weight="700" font-size="11" fill="var(--judge)">legal summaries</text>
+          <rect x="780" y="154" width="105" height="34" rx="8" fill="var(--human-soft)" stroke="var(--human)"></rect>
+          <text x="832" y="175" text-anchor="middle" font-family="var(--display)" font-weight="700" font-size="11" fill="var(--human)">recipe format</text>
+          <text x="832" y="210" text-anchor="middle" class="svg-sub">swap one set in</text>
+          <text x="832" y="225" text-anchor="middle" class="svg-sub">at a time</text>
+          <!-- output -->
+          <path d="M330 240 V262" class="svg-line" stroke-width="2" marker-end="url(#arrC)"></path>
+          <text x="345" y="258" class="svg-text" font-size="13">Output, now with the adapter's habits</text>
+          <text x="20" y="284" class="svg-sub">Full fine-tuning would let every bar inside the dashed box move. LoRA moves only the green side-blocks.</text>
+        </svg>
+        <p class="cap">LoRA in one picture: the big block is read-only during training; the small adapters do all the learning. Different adapters can share the same base model.</p>
+      </div>
+
+      <h3>QLoRA: the same trick on smaller hardware</h3>
+      <p><strong>Quantization</strong> means storing each weight with fewer bits, for example 4 bits instead of 16. The model gets several times smaller in memory and a little less precise. <strong>QLoRA</strong> loads the frozen base model in quantized form and trains normal LoRA adapters on top. Because the big block now takes a fraction of the memory, a model that once needed a server can be fine-tuned on a single mid-range GPU. The quality is usually close to plain LoRA, which is why QLoRA is the default choice for hobbyists and small teams.</p>
+
+      <div class="tbl">
+        <table>
+          <thead><tr><th>Method</th><th>What moves</th><th>Memory needed</th><th>Output file</th><th>When to choose</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Full fine-tuning</strong></td><td>Every weight</td><td>Very high (many big GPUs)</td><td>A whole new model</td><td>Large budget, huge dataset, need maximum change</td></tr>
+            <tr><td><strong>LoRA</strong></td><td>Small adapters only</td><td>Moderate (one or a few GPUs)</td><td>A small adapter file</td><td>The default for most teams</td></tr>
+            <tr><td><strong>QLoRA</strong></td><td>Small adapters; base is compressed</td><td>Low (one mid-range GPU)</td><td>A small adapter file</td><td>Limited hardware, experiments, learning</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="box key">
+        <span class="label">Key idea</span>
+        <p>Adapters make fine-tuning cheap, reversible and shareable. You keep one base model and a drawer full of small adapter files, one per task. If a fine-tune goes wrong, you delete a file, not a model.</p>
+      </div>
+
+      <div class="box doubt">
+        <span class="label">Common doubt</span>
+        <p><strong>"Is LoRA worse than full fine-tuning?"</strong> For style, format and narrow tasks, the difference is usually small enough that you cannot measure it. Full fine-tuning pulls ahead when you have a very large dataset and want deep changes, which is rarely the beginner's situation.</p>
+      </div>
+
+      <details class="deeper">
+        <summary>Go deeper: why "low-rank" works</summary>
+        <p>Each layer of the model holds a large grid of numbers (a matrix). Full fine-tuning would change every entry. LoRA bets that the change you need is simple: it can be described as the product of two thin matrices, one tall and one wide, with far fewer numbers in total. "Rank" is the width of those thin matrices; a rank of 8 or 16 is common. It works because the adjustments a specialist needs are small and structured, not random noise across the whole grid.</p>
+      </details>
+    </section>
+
+    <!-- ===================== CHAPTER 4 ===================== -->
+    <section class="chapter" id="c4">
+      <div class="chapter-head">
+        <div class="eyebrow">Step 4 · The hard part</div>
+        <h2>The data is the product</h2>
+        <p class="goal">Training is a few commands. The dataset is where the weeks go, and where the quality comes from.</p>
+      </div>
+
+      <p>A fine-tuning dataset is a list of examples. For supervised fine-tuning each example is one prompt and the exact answer you wish the model had given. The most common file format is <strong>JSONL</strong>: a plain text file with one JSON object per line. It is popular because you can add examples by appending lines and inspect the file with any text editor.</p>
+
+<pre><code><span class="cm"># train.jsonl: one example per line, nothing else on the line</span>
+{<span class="st">"prompt"</span>: <span class="st">"Customer: My order arrived damaged."</span>, <span class="st">"response"</span>: <span class="st">"I am sorry about that. Please reply with your order number and a photo, and we will send a replacement."</span>}
+{<span class="st">"prompt"</span>: <span class="st">"Customer: Where is my refund?"</span>, <span class="st">"response"</span>: <span class="st">"Refunds appear on your statement within 5 to 7 business days. Could you share the order number so I can check its status?"</span>}</code></pre>
+
+      <h3>How many examples?</h3>
+      <p>Rules of thumb, not laws. <strong>Tens</strong> of examples are enough to see whether the idea works at all. <strong>Hundreds</strong> usually produce a clear, measurable change in format and tone. <strong>Thousands</strong> are needed for robust behaviour across edge cases. Beyond that, quality and variety matter more than count. Five hundred careful, varied examples beat five thousand sloppy or repetitive ones every time.</p>
+
+      <div class="cards">
+        <div class="card"><h4>Cover the edges</h4><p>Angry customers, empty messages, two questions in one, questions in another language. If a case is missing from the data, the model will improvise on it.</p></div>
+        <div class="card"><h4>Be consistent</h4><p>If half the ideal answers start with "Hi" and half do not, the model learns to flip a coin. Decide the format once and apply it everywhere.</p></div>
+        <div class="card"><h4>Remove the wrong ones</h4><p>A single confidently wrong example teaches a confidently wrong habit. Contradictory pairs (same question, different answers) are worse than no example.</p></div>
+        <div class="card"><h4>Keep responses honest</h4><p>Include examples where the right answer is "I do not know, let me check". Otherwise the model learns that every question has a confident answer.</p></div>
+      </div>
+
+      <h3>Synthetic data</h3>
+      <p><strong>Synthetic data</strong> is training data written by a model instead of a person, usually a large model asked to produce ideal answers or to invent varied customer questions. It is fast and cheap, and it is how distillation works. The risks: the big model's mistakes become your small model's habits; generated questions tend to be blander and less varied than real ones; and you may be limited by the big model's terms of use. The safe pattern is to generate, then have a person review a sample and delete the bad ones.</p>
+
+      <div class="box warn">
+        <span class="label">Licensing and privacy</span>
+        <p>Training data is copied into the model's habits. Do not train on customer messages that contain names, addresses or card numbers unless you have permission and have removed the personal details. Do not train on text you do not have the right to use. A fine-tuned model can and will repeat fragments of its training data.</p>
+      </div>
+
+      <div class="play">
+        <span class="label">Playground</span>
+        <h4>Dataset inspector</h4>
+        <p style="font-size:.93rem;color:var(--ink-2)">Below is a tiny JSONL training file with a few problems hidden in it. Press Check to see what an inspection script would catch. Edit the lines, break things, fix things, and check again.</p>
+        <div class="field"><label for="dsIn">train.jsonl (one JSON object per line)</label>
+<textarea id="dsIn" rows="9" spellcheck="false">{"prompt": "Customer: My order arrived damaged. What should I do?", "response": "I am sorry about that. Please reply with your order number and a photo of the damage, and we will send a replacement within 3 business days."}
+{"prompt": "Customer: Can I change my delivery address?", "response": "Yes, as long as the parcel has not shipped. Please share your order number and the new address and I will update it."}
+{"prompt": "Customer: Where is my refund?", "response": "Refunds appear on your statement within 5 to 7 business days. Could you share the order number so I can check?
+{"prompt": "Customer: Do you ship to Canada?", "response": ""}
+{"prompt": "Customer: How do I return a jacket?", "response": "Great question! There are so many things to say about returns. First of all, thank you for shopping with us, we really appreciate it and hope you had a wonderful experience browsing our collection, which we update every season with the latest styles from designers around the world. Now, returns. Returns are accepted within 30 days. To start a return, log in, open your orders, choose the item, and print the label. Pack the jacket with the tags attached. Drop it at any courier point. Once we receive it we inspect it, which can take a few days depending on volume, and then issue a refund to the original payment method. If you paid by gift card the refund goes back to a gift card. If you have any other questions at all, do not hesitate to ask, we are always here to help you with anything you need!"}
+{"prompt": "Customer: My discount code did not work.", "response": "Sorry about that. Please send me the code and your order number and I will check whether it is still valid."}</textarea></div>
+        <button class="btn" type="button" id="dsCheck">Check the dataset</button>
+        <div class="results" id="dsOut"></div>
+        <div id="dsList" style="margin-top:12px;font-size:.93rem"></div>
+      </div>
+
+      <div class="box key">
+        <span class="label">Key idea</span>
+        <p>The model becomes a mirror of the dataset. Every inconsistency, every wrong answer and every missing case in the data will show up in the model's behaviour. Spend most of your fine-tuning time on the examples, not on the training settings.</p>
+      </div>
+
+      <div class="box tip">
+        <span class="label">Practical tip</span>
+        <p>Before training, split the data three ways. The <strong>training set</strong> (most of it) is what the model learns from. The <strong>validation set</strong> (a small held-out slice) is used during training to watch for trouble. The <strong>test set</strong> (another held-out slice, or your eval set from Part 5) is used once at the end for the honest score. Never let the three overlap.</p>
+      </div>
+    </section>
+
+    <!-- ===================== CHAPTER 5 ===================== -->
+    <section class="chapter" id="c5">
+      <div class="chapter-head">
+        <div class="eyebrow">Step 5 · Inside the loop</div>
+        <h2>What happens during training</h2>
+        <p class="goal">Epochs, batches, learning rate and loss, explained without maths, plus a live chart where you can watch overfitting happen.</p>
+      </div>
+
+      <p>Training is a loop that repeats one small step millions of times. Take a <strong>batch</strong> (a handful of examples, say 8 or 32). Show the model the prompts and let it produce answers. Measure the <strong>loss</strong>: a single number saying how far the model's answers are from the ideal answers in the batch. High loss means very wrong; zero would mean perfect. Then compute the <strong>gradient</strong>, which is the direction to nudge every weight so the loss goes down, and nudge each weight a little in that direction. The size of the nudge is the <strong>learning rate</strong>. Then take the next batch.</p>
+      <p>One pass over the entire training set is an <strong>epoch</strong>. Fine-tuning usually runs for a few epochs, often between one and five. Too few and the model has not absorbed the habit (<strong>underfitting</strong>). Too many and it memorises the exact training examples and gets worse on anything new (<strong>overfitting</strong>).</p>
+
+      <div class="diagram">
+        <svg viewBox="0 0 900 300" role="img" aria-label="The training loop: batch, model guess, loss, weight update, repeat">
+          <defs><marker id="arrD" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--ink-3)"></path></marker></defs>
+          <path id="loopD" d="M262 70 H748 V230 H152 V70 Z" fill="none" stroke="none"></path>
+          <!-- nodes -->
+          <rect x="40" y="40" width="220" height="60" rx="12" fill="var(--accent-soft)" stroke="var(--accent)"></rect>
+          <text x="150" y="65" text-anchor="middle" class="svg-text" font-size="13">1. Take a batch</text>
+          <text x="150" y="84" text-anchor="middle" class="svg-sub">a few training examples</text>
+
+          <rect x="640" y="40" width="220" height="60" rx="12" fill="var(--accent)"></rect>
+          <text x="750" y="65" text-anchor="middle" font-family="var(--display)" font-weight="700" font-size="13" fill="#fff">2. Model answers</text>
+          <text x="750" y="84" text-anchor="middle" font-family="var(--display)" font-size="11" fill="#fff">with its current weights</text>
+
+          <rect x="640" y="200" width="220" height="60" rx="12" fill="var(--bad-soft)" stroke="var(--bad)"></rect>
+          <text x="750" y="225" text-anchor="middle" class="svg-text" font-size="13">3. Measure the loss</text>
+          <text x="750" y="244" text-anchor="middle" class="svg-sub">how far from the ideal answer?</text>
+
+          <rect x="40" y="200" width="220" height="60" rx="12" fill="var(--good-soft)" stroke="var(--good)"></rect>
+          <text x="150" y="225" text-anchor="middle" class="svg-text" font-size="13">4. Nudge the weights</text>
+          <text x="150" y="244" text-anchor="middle" class="svg-sub">gradient x learning rate</text>
+
+          <!-- arrows -->
+          <path d="M262 70 H636" class="svg-line" stroke-width="2" marker-end="url(#arrD)"></path>
+          <path d="M750 100 V196" class="svg-line" stroke-width="2" marker-end="url(#arrD)"></path>
+          <path d="M638 230 H264" class="svg-line" stroke-width="2" marker-end="url(#arrD)"></path>
+          <path d="M150 200 V104" class="svg-line" stroke-width="2" marker-end="url(#arrD)"></path>
+
+          <!-- centre text -->
+          <text x="450" y="140" text-anchor="middle" class="svg-text" font-size="13">one step</text>
+          <text x="450" y="160" text-anchor="middle" class="svg-sub">repeat for every batch</text>
+          <text x="450" y="178" text-anchor="middle" class="svg-sub">one pass over all the data = one epoch</text>
+          <text x="20" y="290" class="svg-sub">With LoRA, step 4 nudges only the adapters. Everything else in the loop is the same.</text>
+
+          <circle r="7" fill="var(--human)" stroke="var(--surface)" stroke-width="2">
+            <animateMotion dur="6s" repeatCount="indefinite"><mpath href="#loopD"></mpath></animateMotion>
+          </circle>
+        </svg>
+        <p class="cap">The training loop. The dot is one batch making its way round. The loss is the only feedback the model ever gets; it never sees a score, a rubric or a user.</p>
+      </div>
+
+      <div class="box analogy">
+        <span class="label">Analogy</span>
+        <p>Learning to throw darts blindfolded, with a friend calling out how far you missed. Each throw is a step. "Two inches high" is the loss. Adjusting your arm slightly downward is the gradient. How much you adjust is the learning rate: tiny adjustments take forever, huge ones overshoot and you end up worse. Going through your whole bag of darts once is an epoch.</p>
+      </div>
+
+      <h3>Watching for overfitting</h3>
+      <p>During training you track two losses. The <strong>training loss</strong> is measured on the batches the model is learning from, so it almost always keeps going down. The <strong>validation loss</strong> is measured on the held-out validation set, which the model never trains on. As long as both go down, the model is learning something general. When the validation loss starts to rise while the training loss keeps falling, the model has begun memorising. <strong>Early stopping</strong> means keeping the version of the model from the epoch where validation loss was lowest and throwing away the rest.</p>
+
+      <div class="play">
+        <span class="label">Playground</span>
+        <h4>Loss curve explorer</h4>
+        <p style="font-size:.93rem;color:var(--ink-2)">A simulated training run. Drag the sliders. Watch where the validation curve stops following the training curve; that turning point is where you should stop.</p>
+        <div class="grid4">
+          <div class="field"><label for="lcEpochs">Epochs: <span class="val" id="lcEpochsVal">12</span></label><input id="lcEpochs" type="range" min="1" max="20" value="12"></div>
+          <div class="field"><label for="lcLr">Learning rate: <span class="val" id="lcLrVal">medium</span></label><input id="lcLr" type="range" min="0" max="2" value="1"></div>
+        </div>
+        <div id="lcChart" style="margin-top:12px"></div>
+        <div class="results" id="lcOut"></div>
+        <p id="lcText" style="font-size:.93rem;color:var(--ink-2);margin-top:10px"></p>
+      </div>
+
+      <div class="box key">
+        <span class="label">Key idea</span>
+        <p>Training loss tells you the model is learning the examples. Validation loss tells you whether it is learning the <em>task</em>. Only the second one matters, and the gap between them is your overfitting alarm.</p>
+      </div>
+
+      <div class="box doubt">
+        <span class="label">Common doubt</span>
+        <p><strong>"Should I just train for more epochs to be safe?"</strong> No. More epochs past the turning point make the model worse on new inputs, not better. When in doubt, train for fewer epochs and rely on early stopping.</p>
+      </div>
+
+      <details class="deeper">
+        <summary>Go deeper: the settings you will actually see</summary>
+        <p>A typical fine-tuning job asks for four or five numbers: the number of epochs, the batch size, the learning rate, and for LoRA the rank (Step 3) and a scaling factor. Sensible defaults exist for all of them, and providers pick reasonable values for you. The rule for beginners: change one setting at a time, keep the validation set fixed, and write down the result. Learning rate is the one that most often needs adjusting; if the loss curve is jumpy, lower it; if it barely moves, raise it.</p>
+      </details>
+    </section>
+
+    <!-- ===================== CHAPTER 6 ===================== -->
+    <section class="chapter" id="c6">
+      <div class="chapter-head">
+        <div class="eyebrow">Step 6 · Proof</div>
+        <h2>Checking the result</h2>
+        <p class="goal">A finished training run proves nothing. Learn the three comparisons that tell you whether the fine-tune was worth it.</p>
+      </div>
+
+      <p>Part 5 taught you to build an <strong>eval</strong>: a fixed set of test inputs with a way to score the outputs. That eval set is the whole reason you can judge a fine-tune at all. Run it on the base model before training and on the fine-tuned model after training, with identical inputs and identical scoring. The difference between the two numbers is the effect of the fine-tune.</p>
+
+      <h3>Three comparisons, in order</h3>
+      <div class="ladder">
+        <div class="rung"><div class="num">1</div><div><h4>Before versus after, on your task</h4><p>Same eval set, same grader. Did the score go up? By how much? Look at the failures the fine-tuned model still makes; they show you what the training data was missing.</p></div></div>
+        <div class="rung"><div class="num">2</div><div><h4>Against the honest baseline</h4><p>The <strong>baseline</strong> is the base model with the best prompt you could write, not with a lazy prompt. If the well-prompted base model scores the same as the fine-tune, you have paid for nothing. This comparison is skipped surprisingly often.</p></div></div>
+        <div class="rung"><div class="num">3</div><div><h4>Regressions elsewhere</h4><p>A <strong>regression</strong> is something that used to work and now does not. Run a small set of general tasks (summaries, simple maths, a different format) on both models. A fine-tune that improves your task but breaks everything else may still be a bad deal.</p></div></div>
+      </div>
+
+      <p>The failure behind comparison 3 has a name: <strong>catastrophic forgetting</strong>. When a model is trained hard on one narrow task, the weights that handled other tasks get overwritten. The model gets better at answering support tickets and worse at, say, writing a summary or following a new instruction. LoRA with a modest learning rate and few epochs makes this less likely, but it does not make it impossible, so you measure.</p>
+
+      <div class="box key">
+        <span class="label">Key idea</span>
+        <p>If a better prompt gets the same result, do not fine-tune. The eval set decides, not the feeling that the fine-tuned model "seems better". Numbers before, numbers after, numbers on the baseline, numbers on general tasks.</p>
+      </div>
+
+<pre><code><span class="cm"># compare.py: the honest comparison, in plain Python</span>
+<span class="kw">import</span> json
+
+<span class="kw">def</span> <span class="fn">call_model</span>(prompt: str, model: str) -&gt; str:
+    <span class="cm"># Put any LLM API call here. "model" is a base or fine-tuned model name.</span>
+    ...
+
+<span class="kw">def</span> <span class="fn">load_jsonl</span>(path: str) -&gt; list:
+    <span class="cm"># one JSON object per line; skip blank lines</span>
+    <span class="kw">with</span> open(path) <span class="kw">as</span> f:
+        <span class="kw">return</span> [json.loads(line) <span class="kw">for</span> line <span class="kw">in</span> f <span class="kw">if</span> line.strip()]
+
+<span class="kw">def</span> <span class="fn">grade</span>(output: str, expected: str) -&gt; bool:
+    <span class="cm"># the simplest grader from Part 5; swap in a judge for open-ended tasks</span>
+    <span class="kw">return</span> output.strip().lower() == expected.strip().lower()
+
+<span class="kw">def</span> <span class="fn">score</span>(model: str, template: str, items: list) -&gt; float:
+    hits = 0
+    <span class="kw">for</span> item <span class="kw">in</span> items:
+        out = call_model(template.format(q=item[<span class="st">"prompt"</span>]), model)
+        hits += grade(out, item[<span class="st">"response"</span>])
+    <span class="kw">return</span> hits / len(items)
+
+eval_set = load_jsonl(<span class="st">"eval.jsonl"</span>)      <span class="cm"># never used for training</span>
+general  = load_jsonl(<span class="st">"general.jsonl"</span>)   <span class="cm"># unrelated tasks, to catch forgetting</span>
+
+plain = <span class="st">"Q: {q}\nA:"</span>
+best  = <span class="st">"You are a support agent. Answer in one sentence and ask for the order number.\nQ: {q}\nA:"</span>
+
+print(<span class="st">"base, plain prompt   "</span>, score(<span class="st">"base-model"</span>, plain, eval_set))
+print(<span class="st">"base, best prompt    "</span>, score(<span class="st">"base-model"</span>, best,  eval_set))  <span class="cm"># the honest baseline</span>
+print(<span class="st">"fine-tuned, plain    "</span>, score(<span class="st">"my-model-v1"</span>, plain, eval_set)) <span class="cm"># did the habit stick?</span>
+print(<span class="st">"fine-tuned, general  "</span>, score(<span class="st">"my-model-v1"</span>, plain, general))  <span class="cm"># any regressions?</span>
+print(<span class="st">"base, general        "</span>, score(<span class="st">"base-model"</span>, plain, general))</code></pre>
+
+      <div class="box doubt">
+        <span class="label">Common doubt</span>
+        <p><strong>"The validation loss went down nicely. Isn't that enough?"</strong> No. Loss measures how closely the model's text matches the training answers word by word. It does not measure whether the answers are correct, safe or useful. A model can reach a low loss by copying your formatting quirks perfectly while getting the substance wrong. The eval set measures what you care about; the loss measures what the optimiser cares about.</p>
+      </div>
+
+      <div class="box tip">
+        <span class="label">Practical tip</span>
+        <p>Save the outputs of every comparison, not just the scores. Reading twenty side-by-side answers from the base model and the fine-tune teaches you more about what the training did than any single number.</p>
+      </div>
+    </section>
+
+    <!-- ===================== CHAPTER 7 ===================== -->
+    <section class="chapter" id="c7">
+      <div class="chapter-head">
+        <div class="eyebrow">Step 7 · Into production</div>
+        <h2>Serving a fine-tuned model</h2>
+        <p class="goal">Training makes a file. Somebody still has to run it. Two ways to do that, and what quantization and versioning mean for you.</p>
+      </div>
+
+      <p><strong>Hosted fine-tuning</strong> is the easy route. You upload your JSONL file to a model provider, they run the training on their hardware, and when it finishes you get a new model name. Your application calls that name instead of the base model's name and nothing else changes. You never see a GPU. The trade-offs: you can only fine-tune the models that provider offers, you pay their per-token price for the new model, and your training data leaves your building.</p>
+      <p><strong>Self-hosting</strong> means you run the model yourself. You need GPUs (rented by the hour or owned) and an <strong>inference server</strong>: a program whose job is to load the model into GPU memory and answer requests quickly, batching many users together. Tools such as vLLM are inference servers built for this. Self-hosting works only with <strong>open-weight models</strong>, models whose weight files you are allowed to download and run. Self-hosting gives you control, privacy and often a lower cost at high volume, in exchange for operating a service.</p>
+
+      <div class="diagram">
+        <svg viewBox="0 0 920 300" role="img" aria-label="Two ways to serve a fine-tuned model: hosted by a provider, or self-hosted on your own GPUs">
+          <defs><marker id="arrE" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--ink-3)"></path></marker></defs>
+          <!-- Hosted panel -->
+          <rect x="20" y="20" width="430" height="260" rx="14" fill="var(--surface-2)" stroke="var(--line)"></rect>
+          <text x="235" y="48" text-anchor="middle" class="svg-text" font-size="15">Hosted fine-tuning</text>
+          <rect x="40" y="70" width="120" height="50" rx="10" fill="var(--surface)" stroke="var(--line)"></rect>
+          <text x="100" y="91" text-anchor="middle" class="svg-text" font-size="12">train.jsonl</text>
+          <text x="100" y="108" text-anchor="middle" class="svg-sub">you upload</text>
+          <path d="M160 95 H198" class="svg-line" stroke-width="2" marker-end="url(#arrE)"></path>
+          <rect x="200" y="62" width="230" height="66" rx="10" fill="var(--judge-soft)" stroke="var(--judge)"></rect>
+          <text x="315" y="86" text-anchor="middle" class="svg-text" font-size="12">Provider trains and hosts</text>
+          <text x="315" y="104" text-anchor="middle" class="svg-sub">their GPUs, their servers</text>
+          <text x="315" y="120" text-anchor="middle" class="svg-sub">returns: "my-model-v1"</text>
+          <path d="M315 128 V166" class="svg-line" stroke-width="2" marker-end="url(#arrE)"></path>
+          <rect x="200" y="170" width="230" height="50" rx="10" fill="var(--accent)"></rect>
+          <text x="315" y="192" text-anchor="middle" font-family="var(--display)" font-weight="700" font-size="12" fill="#fff">Your app calls "my-model-v1"</text>
+          <text x="315" y="209" text-anchor="middle" font-family="var(--display)" font-size="11" fill="#fff">over the same API as before</text>
+          <text x="40" y="248" class="svg-sub">+ no hardware, minutes to set up</text>
+          <text x="40" y="266" class="svg-sub">- only their models; data leaves your building</text>
+
+          <!-- Self-hosted panel -->
+          <rect x="470" y="20" width="430" height="260" rx="14" fill="var(--surface-2)" stroke="var(--line)"></rect>
+          <text x="685" y="48" text-anchor="middle" class="svg-text" font-size="15">Self-hosting</text>
+          <rect x="490" y="62" width="280" height="130" rx="10" fill="var(--surface)" stroke="var(--line)"></rect>
+          <text x="630" y="84" text-anchor="middle" class="svg-text" font-size="12">Your GPU + inference server</text>
+          <rect x="506" y="98" width="150" height="40" rx="8" class="svg-box"></rect>
+          <text x="581" y="116" text-anchor="middle" class="svg-sub">open-weight base</text>
+          <text x="581" y="130" text-anchor="middle" class="svg-sub">(quantized: 4-bit)</text>
+          <rect x="666" y="98" width="90" height="40" rx="8" fill="var(--good)"></rect>
+          <text x="711" y="116" text-anchor="middle" font-family="var(--display)" font-weight="700" font-size="11" fill="#fff">adapter</text>
+          <text x="711" y="130" text-anchor="middle" font-family="var(--display)" font-size="11" fill="#fff">v1 / v2 / v3</text>
+          <text x="630" y="164" text-anchor="middle" class="svg-sub">merge the adapter in, or load it per request</text>
+          <text x="630" y="180" text-anchor="middle" class="svg-sub">batches many users at once</text>
+          <path d="M630 192 V218" class="svg-line" stroke-width="2" marker-end="url(#arrE)"></path>
+          <rect x="490" y="222" width="280" height="36" rx="10" fill="var(--accent)"></rect>
+          <text x="630" y="245" text-anchor="middle" font-family="var(--display)" font-weight="700" font-size="12" fill="#fff">Your app calls your own server</text>
+          <text x="790" y="90" class="svg-sub">+ control, privacy,</text>
+          <text x="790" y="106" class="svg-sub">  cheaper at volume</text>
+          <text x="790" y="134" class="svg-sub">- you run GPUs,</text>
+          <text x="790" y="150" class="svg-sub">  upgrades, on-call</text>
+        </svg>
+        <p class="cap">Hosted: upload data, get a model name. Self-hosted: run an open-weight base model plus your adapter on your own GPUs behind an inference server.</p>
+      </div>
+
+      <h3>Merging adapters, and why quantization matters here too</h3>
+      <p>An adapter from Step 3 can be served two ways. You can <strong>merge</strong> it into the base model, which means folding the adapter's small changes into the big weight grid once, producing a single ordinary model file that runs at full speed. Or you can keep the base model loaded and attach the adapter at request time, which lets one server hold one base model and dozens of adapters, switching between them per customer. Merging is simpler; loading per request is more flexible.</p>
+      <p>Quantization matters at serving time even more than at training time. A model stored with 4 bits per weight instead of 16 needs a quarter of the memory, fits on a cheaper GPU, and produces tokens faster because less data moves around. The price is a small, measurable loss of quality. Run your eval set on the quantized model too, because "small" is not "zero".</p>
+
+      <div class="box analogy">
+        <span class="label">Analogy</span>
+        <p>Hosted fine-tuning is a restaurant kitchen cooking your recipe: you hand over the recipe, they buy the equipment, and you order plates. Self-hosting is building your own kitchen: more work, but nobody else touches your ingredients and the per-plate cost drops once you are busy every night.</p>
+      </div>
+
+      <div class="box tip">
+        <span class="label">Practical tip: version models like code</span>
+        <p>Give every fine-tune a name with a number (<code>support-v3</code>), and store with it the exact training file, the settings used, the base model name and the eval scores. When something goes wrong in production, you want to roll back to <code>support-v2</code> and know precisely what changed. A model whose training data you cannot find is a model you cannot fix.</p>
+      </div>
+
+      <div class="box key">
+        <span class="label">Key idea</span>
+        <p>Start hosted if you can; it removes every operational problem except the ones that matter (data, evals). Move to self-hosting when privacy rules, cost at volume, or the need for a model the providers do not offer forces you to.</p>
+      </div>
+    </section>
+
+    <!-- ===================== CHAPTER 8 ===================== -->
+    <section class="chapter" id="c8">
+      <div class="chapter-head">
+        <div class="eyebrow">Step 8 · Judgement</div>
+        <h2>Cost, time, and when it is worth it</h2>
+        <p class="goal">The effort ladder, the reasons that justify climbing it, the reasons that do not, and the mistakes almost everyone makes once.</p>
+      </div>
+
+      <div class="diagram">
+        <svg viewBox="0 0 900 300" role="img" aria-label="The effort ladder: prompting takes minutes, RAG days, LoRA fine-tuning days plus data work, full fine-tuning weeks and expensive hardware">
+          <!-- baseline -->
+          <line x1="40" y1="250" x2="880" y2="250" stroke="var(--line)" stroke-width="2"></line>
+          <!-- step 1 -->
+          <rect x="60" y="210" width="180" height="40" rx="8" fill="var(--good)"></rect>
+          <text x="150" y="235" text-anchor="middle" font-family="var(--display)" font-weight="700" font-size="13" fill="#fff">Prompting</text>
+          <text x="150" y="196" text-anchor="middle" class="svg-text" font-size="12">minutes</text>
+          <text x="150" y="272" text-anchor="middle" class="svg-sub">edit, retry, undo for free</text>
+          <!-- step 2 -->
+          <rect x="270" y="160" width="180" height="90" rx="8" fill="var(--judge)"></rect>
+          <text x="360" y="210" text-anchor="middle" font-family="var(--display)" font-weight="700" font-size="13" fill="#fff">RAG</text>
+          <text x="360" y="146" text-anchor="middle" class="svg-text" font-size="12">days</text>
+          <text x="360" y="272" text-anchor="middle" class="svg-sub">index docs, tune retrieval</text>
+          <!-- step 3 -->
+          <rect x="480" y="100" width="180" height="150" rx="8" fill="var(--accent)"></rect>
+          <text x="570" y="170" text-anchor="middle" font-family="var(--display)" font-weight="700" font-size="13" fill="#fff">LoRA fine-tune</text>
+          <text x="570" y="190" text-anchor="middle" font-family="var(--display)" font-size="11" fill="#fff">one GPU, small adapter</text>
+          <text x="570" y="86" text-anchor="middle" class="svg-text" font-size="12">days + data work</text>
+          <text x="570" y="272" text-anchor="middle" class="svg-sub">mostly data work</text>
+          <!-- step 4 -->
+          <rect x="690" y="40" width="180" height="210" rx="8" fill="var(--human)"></rect>
+          <text x="780" y="140" text-anchor="middle" font-family="var(--display)" font-weight="700" font-size="13" fill="#fff">Full fine-tune</text>
+          <text x="780" y="160" text-anchor="middle" font-family="var(--display)" font-size="11" fill="#fff">many GPUs, whole model</text>
+          <text x="780" y="26" text-anchor="middle" class="svg-text" font-size="12">weeks + expensive hardware</text>
+          <text x="780" y="272" text-anchor="middle" class="svg-sub">rarely the first move</text>
+          <text x="40" y="294" class="svg-sub">Height = effort and cost, as a rough rule of thumb. Each rung is also harder to undo than the one before.</text>
+        </svg>
+        <p class="cap">The effort ladder. Climb one rung at a time, and only when the rung below has been tried properly and measured.</p>
+      </div>
+
+      <div class="vs">
+        <div class="r"><h4>Good reasons to fine-tune</h4><ul><li>A strict output format on a huge volume of requests (always valid JSON, always the same fields)</li><li>A specific voice or house style that prompts keep drifting from</li><li>A small, fast model for one narrow task, distilled from a big one</li><li>Cutting latency and cost by shrinking the prompt</li><li>Classification or tagging at scale, where you have thousands of labelled examples</li></ul></div>
+        <div class="l"><h4>Bad reasons to fine-tune</h4><ul><li>Wanting the model to know facts (use RAG)</li><li>A one-off or rarely repeated task</li><li>No eval set yet, so no way to know if it helped</li><li>"The prompt is getting long" when you have not tried a tidier prompt</li><li>Because it sounds more serious than prompting</li></ul></div>
+      </div>
+
+      <h3>Common mistakes</h3>
+      <ol>
+        <li><strong>Skipping the prompt baseline.</strong> The fine-tune "wins" against a lazy prompt, and nobody checks whether a good prompt would have won too.</li>
+        <li><strong>Training on the eval set.</strong> The scores look wonderful and mean nothing, because the model has seen the exam.</li>
+        <li><strong>Inconsistent examples.</strong> Three people wrote the ideal answers in three styles, and the model learned to pick one at random.</li>
+        <li><strong>Too many epochs.</strong> The training loss looked great; the validation loss was never checked; the model recites training examples word for word.</li>
+        <li><strong>Forgetting to check general ability.</strong> The support model now refuses to write a summary.</li>
+        <li><strong>Baking in things that change.</strong> Prices, policies and product names go into the training data, then change a month later, and now the model is confidently out of date.</li>
+        <li><strong>Losing the recipe.</strong> No record of which data and settings produced the deployed model, so it cannot be reproduced or fixed.</li>
+      </ol>
+
+      <div class="box analogy">
+        <span class="label">Analogy</span>
+        <p>Hiring for a post office counter. Prompting is a clear checklist taped to the desk. RAG is the binder of current rates the clerk looks up. Fine-tuning is sending the clerk on a training course. You would not send someone on a course to learn this week's stamp prices; you would update the binder. You would send them on a course to learn how to handle every customer the same calm way.</p>
+      </div>
+
+      <div class="box key">
+        <span class="label">Key idea</span>
+        <p>Fine-tuning is worth it when three things are true at once: the cheaper levers have been tried and measured, the need is about behaviour rather than knowledge, and the volume or the constraints make the training cost pay for itself. If any one is missing, wait.</p>
+      </div>
+
+      <div class="box doubt">
+        <span class="label">Common doubt</span>
+        <p><strong>"Do I need to be a machine learning expert to fine-tune?"</strong> Not for hosted fine-tuning with LoRA and a few hundred examples: the provider handles the maths. What you do need is the discipline from Part 5: a clean eval set, a held-out validation set, and the habit of comparing numbers rather than impressions.</p>
+      </div>
+    </section>
+
+    <!-- ===================== CHAPTER 9 ===================== -->
+    <section class="chapter" id="c9">
+      <div class="chapter-head">
+        <div class="eyebrow">Step 9 · Check yourself</div>
+        <h2>Quiz and glossary</h2>
+        <p class="goal">Six questions to test the ideas, then every term from this guide in one place.</p>
+      </div>
+
+      <div class="quiz" id="quiz"></div>
+
+      <h3>Glossary</h3>
+      <dl class="gloss">
+        <dt>Adapter</dt><dd>A small set of trainable layers attached to a frozen base model. LoRA produces adapters. They can be swapped, shared and merged.</dd>
+        <dt>Base model</dt><dd>The model as it comes out of pre-training, before any fine-tuning for your task.</dd>
+        <dt>Baseline</dt><dd>The score you compare against. For fine-tuning, the honest baseline is the base model with the best prompt you can write.</dd>
+        <dt>Batch</dt><dd>A small group of training examples processed together in one training step.</dd>
+        <dt>Catastrophic forgetting</dt><dd>When training on a narrow task overwrites the weights that handled other tasks, so the model gets worse at things it used to do.</dd>
+        <dt>Continued pre-training</dt><dd>Feeding the model a large amount of raw text from a field so it absorbs vocabulary and some knowledge. Expensive and rarely needed.</dd>
+        <dt>Distillation</dt><dd>Fine-tuning a small student model on answers written by a large teacher model, to get a cheaper, faster model for a narrow task.</dd>
+        <dt>DPO</dt><dd>Direct preference optimisation. A preference-tuning method that learns directly from pairs of better and worse answers, with no separate reward model.</dd>
+        <dt>Early stopping</dt><dd>Keeping the version of the model from the epoch where validation loss was lowest, and discarding later epochs.</dd>
+        <dt>Epoch</dt><dd>One complete pass through the training set.</dd>
+        <dt>Eval</dt><dd>A repeatable test that scores a model on a fixed set of inputs (Part 5). The tool that decides whether a fine-tune helped.</dd>
+        <dt>Fine-tuning</dt><dd>Continuing the training of an already-trained model on your own examples so its behaviour shifts toward them.</dd>
+        <dt>Frozen weights</dt><dd>Weights that are not allowed to change during training. In LoRA, the whole base model is frozen.</dd>
+        <dt>GPU</dt><dd>Graphics processing unit. The chip that does the heavy arithmetic of training and running models.</dd>
+        <dt>Gradient</dt><dd>The direction to nudge each weight so the loss goes down.</dd>
+        <dt>Hosted fine-tuning / self-hosting</dt><dd>Hosted: a provider trains and serves the model on their hardware, and you call a new model name. Self-hosting: you run the model on GPUs you control, behind your own inference server.</dd>
+        <dt>Inference server</dt><dd>Software that loads a model onto GPUs and answers requests efficiently, batching many users. vLLM is one example.</dd>
+        <dt>JSONL</dt><dd>A text file format with one JSON object per line. The usual format for training data.</dd>
+        <dt>Learning rate</dt><dd>How big each weight nudge is during training. Too low is slow; too high overshoots and becomes unstable.</dd>
+        <dt>LoRA</dt><dd>Low-rank adaptation. A method that freezes the base model and trains small adapters instead, cutting memory and cost.</dd>
+        <dt>Loss</dt><dd>A single number measuring how far the model's outputs are from the ideal outputs. Training tries to push it down.</dd>
+        <dt>Merge (adapter merge)</dt><dd>Folding an adapter's changes into the base model's weights to produce one ordinary model file.</dd>
+        <dt>Open-weight model</dt><dd>A model whose weight files can be downloaded and run on your own hardware.</dd>
+        <dt>Overfitting / underfitting</dt><dd>Overfitting: the model memorises its training examples and gets worse on new inputs, seen as validation loss rising while training loss falls. Underfitting: the model has not learned enough, and both losses stay high.</dd>
+        <dt>Parameter-efficient fine-tuning (PEFT)</dt><dd>Any method that fine-tunes by changing only a small fraction of the weights. LoRA and QLoRA are the common ones.</dd>
+        <dt>Preference tuning</dt><dd>Training from pairs of answers marked better and worse, so the model learns judgement and taste rather than just format.</dd>
+        <dt>Pre-training</dt><dd>The original, enormous training run on general text that produces the base model.</dd>
+        <dt>QLoRA</dt><dd>LoRA with the frozen base model stored in quantized (compressed) form, so it fits on smaller hardware.</dd>
+        <dt>Quantization</dt><dd>Storing weights with fewer bits each. Smaller and faster, with a small loss of quality.</dd>
+        <dt>RAG</dt><dd>Retrieval-augmented generation. Looking up relevant documents at request time and putting them in the prompt (Part 3).</dd>
+        <dt>Regression</dt><dd>Something that used to work and now does not, after a change.</dd>
+        <dt>RLHF</dt><dd>Reinforcement learning from human feedback. Preference tuning that first trains a reward model to score answers, then trains the language model to score highly.</dd>
+        <dt>Supervised fine-tuning (SFT)</dt><dd>Fine-tuning on pairs of input and ideal output. The most common and simplest kind.</dd>
+        <dt>Synthetic data</dt><dd>Training examples written by a model rather than a person. Fast, but inherits the model's mistakes and blandness.</dd>
+        <dt>Teacher model / student model</dt><dd>In distillation, the large model that writes the answers (teacher) and the small model that learns from them (student).</dd>
+        <dt>Token</dt><dd>The small piece of text (roughly a word or part of a word) that a model reads and writes one at a time, and that providers bill by.</dd>
+        <dt>Test set</dt><dd>Held-out examples used once, at the end, for the honest final score. Often the same as your eval set.</dd>
+        <dt>Training set</dt><dd>The examples the model actually learns from.</dd>
+        <dt>Validation set</dt><dd>Held-out examples checked during training to watch for overfitting. Never trained on.</dd>
+        <dt>Weights / parameters</dt><dd>The billions of numbers inside a model that decide how input text becomes output text. Training adjusts them.</dd>
+      </dl>
+
+      <div class="box tip">
+        <span class="label">Where to go next</span>
+        <p>You now know when to train, what to train on, and how to prove it helped. A fine-tuned model is still a model: it can be tricked, leak data and say harmful things. The next guide, <a href="07-safety-and-security.html">Safety and Security</a>, covers the attacks and the defences.</p>
+      </div>
+    </section>
+
+
+    <div class="pager">
+      <a class="prev" href="05-evals.html"><span class="dir">Previous</span><span class="t">Eval Explained</span></a>
+      <a class="next" href="07-safety-and-security.html"><span class="dir">Next</span><span class="t">Safety and Security</span></a>
+    </div>
+    <footer class="footer">Fine-Tuning, part 6 of the LLM Study Guides. Written in plain language for beginners. Numbers are rounded rules of thumb, not exact citations.</footer>
+  </main>
+</div>
+
+<script>
+/* ---------- PAGE-SPECIFIC SCRIPT: define window.QUIZ here and wire up this page's playgrounds ---------- */
+window.QUIZ = [
+  { q: 'Which of these does fine-tuning change most reliably?',
+    opts: ['The facts the model knows about your company', 'The style, format and habits of its answers', 'How much text the model can read at once'],
+    a: 1, exp: 'Step 0: fine-tuning teaches how to answer, not what is true. Facts belong in the prompt, usually through RAG.' },
+  { q: 'Your support bot must answer from a price list that changes every week. Which lever fits best?',
+    opts: ['Fine-tune on the price list every week', 'RAG: look the prices up at request time', 'Add every price to the system prompt by hand'],
+    a: 1, exp: 'Step 1: facts that change belong in retrieval. Training them in bakes in stale answers and costs a retraining run each week.' },
+  { q: 'What does LoRA do?',
+    opts: ['Rewrites every weight in the model', 'Freezes the base model and trains small adapters on the side', 'Compresses the model so it runs faster'],
+    a: 1, exp: 'Step 3: LoRA keeps the base model frozen and trains adapters that are well under one percent of its size. Compression is quantization, a different idea.' },
+  { q: 'Training loss keeps falling but validation loss has started to rise. What is happening?',
+    opts: ['Underfitting: train for more epochs', 'Overfitting: the model is memorising the training set', 'The learning rate is too low'],
+    a: 1, exp: 'Step 5: a rising validation loss while training loss falls is the overfitting signature. Early stopping keeps the version from before the turn.' },
+  { q: 'What is the honest baseline for judging a fine-tune?',
+    opts: ['The base model with a quick, lazy prompt', 'The base model with the best prompt you can write', 'No baseline; the training loss is enough'],
+    a: 1, exp: 'Step 6: if a well-prompted base model scores the same, the fine-tune bought nothing. Loss measures word match, not usefulness.' },
+  { q: 'Quantization means...',
+    opts: ['Storing each weight with fewer bits: smaller and faster, with a small quality loss', 'Splitting the data into batches', 'Merging an adapter into the base model'],
+    a: 0, exp: 'Step 7: quantization trades a little precision for a lot of memory and speed. Re-run your eval on the quantized model to measure the loss.' }
+];
+
+(function () {
+  /* ----- Playground 1: dataset inspector ----- */
+  var dsIn = document.getElementById('dsIn');
+  var dsOut = document.getElementById('dsOut');
+  var dsList = document.getElementById('dsList');
+  var dsBtn = document.getElementById('dsCheck');
+  var TIPS = {
+    json: 'Invalid JSON. Usually a missing quote or bracket. Training tools reject the whole file or silently drop the line; fix it before you upload.',
+    fields: 'Missing field. Every line needs the same keys (here "prompt" and "response"). Pick one schema and apply it to every line.',
+    empty: 'Empty response. The model would learn to say nothing for this kind of question. Write the ideal answer or delete the line.',
+    long: 'Very long response. Rambling answers teach rambling. Cut it to the length you actually want the model to produce, and keep lengths consistent across the file.',
+    dup: 'Duplicate prompt. If the two answers differ, the model learns to pick at random; if they are the same, you are just double-weighting one example.',
+    short: 'Very short prompt. Real inputs are rarely one word. Make sure your prompts look like what the model will see in production.'
+  };
+  function esc(t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  function inspect() {
+    var lines = dsIn.value.split(/\r?\n/);
+    var problems = [], types = {}, usable = 0, total = 0, respWords = 0, respCount = 0, seen = {};
+    for (var i = 0; i < lines.length; i++) {
+      var raw = lines[i];
+      if (!raw.trim()) continue;
+      total++;
+      var n = i + 1, obj = null, bad = false;
+      try { obj = JSON.parse(raw); } catch (e) {
+        problems.push({ line: n, type: 'json', msg: 'not valid JSON (' + esc(e.message).slice(0, 60) + ')' });
+        types.json = true; continue;
+      }
+      if (typeof obj !== 'object' || obj === null || typeof obj.prompt !== 'string' || typeof obj.response !== 'string') {
+        problems.push({ line: n, type: 'fields', msg: 'missing a "prompt" or "response" text field' });
+        types.fields = true; continue;
+      }
+      var p = obj.prompt.trim(), r = obj.response.trim();
+      var words = r ? r.split(/\s+/).length : 0;
+      if (!r) { problems.push({ line: n, type: 'empty', msg: 'the response is empty' }); types.empty = true; bad = true; }
+      else { respWords += words; respCount++; }
+      if (r.length > 500) { problems.push({ line: n, type: 'long', msg: 'the response is very long (' + r.length + ' characters, ' + words + ' words)' }); types.long = true; bad = true; }
+      if (p.length < 8) { problems.push({ line: n, type: 'short', msg: 'the prompt is very short (' + p.length + ' characters)' }); types.short = true; bad = true; }
+      var key = p.toLowerCase();
+      if (seen[key]) { problems.push({ line: n, type: 'dup', msg: 'same prompt as line ' + seen[key] }); types.dup = true; bad = true; }
+      else seen[key] = n;
+      if (!bad) usable++;
+    }
+    var avg = respCount ? Math.round(respWords / respCount) : 0;
+    var pClass = problems.length ? 'fail' : 'pass';
+    dsOut.innerHTML =
+      '<div class="res"><div class="name">Lines</div><div class="val">' + total + '</div><div class="why">non-empty lines in the file</div></div>' +
+      '<div class="res ' + (usable === total && total ? 'pass' : '') + '"><div class="name">Usable examples</div><div class="val">' + usable + '</div><div class="why">lines with no problems</div></div>' +
+      '<div class="res ' + pClass + '"><div class="name">Problems</div><div class="val">' + problems.length + '</div><div class="why">' + Object.keys(types).length + ' kind' + (Object.keys(types).length === 1 ? '' : 's') + ' of problem</div></div>' +
+      '<div class="res"><div class="name">Avg response</div><div class="val">' + avg + '</div><div class="why">words, over non-empty responses</div></div>';
+    var html = '';
+    if (problems.length) {
+      html += '<p style="margin:.4rem 0"><strong>What the inspector found:</strong></p><ul style="margin:.2rem 0">';
+      problems.forEach(function (pr) { html += '<li>Line ' + pr.line + ': ' + pr.msg + '.</li>'; });
+      html += '</ul><p style="margin:.6rem 0 .2rem"><strong>Tips for each kind of problem:</strong></p><ul style="margin:.2rem 0">';
+      Object.keys(types).forEach(function (t) { html += '<li>' + TIPS[t] + '</li>'; });
+      html += '</ul>';
+    } else if (total) {
+      html += '<p style="margin:.4rem 0">No problems found in ' + total + ' lines. Now read a few by hand: a script cannot tell you whether an answer is <em>correct</em>, only whether it is well formed.</p>';
+    } else {
+      html += '<p style="margin:.4rem 0">The file is empty. Paste some JSONL lines above.</p>';
+    }
+    dsList.innerHTML = html;
+  }
+  if (dsBtn) { dsBtn.addEventListener('click', inspect); inspect(); }
+
+  /* ----- Playground 2: loss curve explorer ----- */
+  var lcE = document.getElementById('lcEpochs'), lcL = document.getElementById('lcLr');
+  var lcEV = document.getElementById('lcEpochsVal'), lcLV = document.getElementById('lcLrVal');
+  var lcChart = document.getElementById('lcChart'), lcOut = document.getElementById('lcOut'), lcText = document.getElementById('lcText');
+  var LR = [
+    { name: 'low',    k: 0.22, t0: 10,  c: 0.030, noise: 0.015 },
+    { name: 'medium', k: 0.50, t0: 5.5, c: 0.070, noise: 0.040 },
+    { name: 'high',   k: 0.95, t0: 3,   c: 0.140, noise: 0.180 }
+  ];
+  function trainLoss(x, s) { return 0.30 + 2.0 * Math.exp(-s.k * x) + s.noise * Math.sin(4.2 * x) * Math.exp(-0.05 * x); }
+  function valLoss(x, s) { return 0.50 + 2.0 * Math.exp(-s.k * x) + s.c * Math.max(0, x - s.t0) + s.noise * 0.5 * Math.sin(3.1 * x + 1); }
+  function drawLoss() {
+    var E = +lcE.value, s = LR[+lcL.value];
+    lcEV.textContent = E; lcLV.textContent = s.name;
+    var W = 640, H = 320, L = 52, R = 20, T = 24, B = 44, ymax = 3.0;
+    var pw = W - L - R, ph = H - T - B;
+    function X(x) { return L + (x / E) * pw; }
+    function Y(y) { return T + (1 - Math.min(y, ymax) / ymax) * ph; }
+    var tr = [], va = [], best = 1, bestVal = Infinity;
+    for (var x = 0; x <= E + 1e-9; x += 0.25) {
+      tr.push(X(x).toFixed(1) + ',' + Y(trainLoss(x, s)).toFixed(1));
+      va.push(X(x).toFixed(1) + ',' + Y(valLoss(x, s)).toFixed(1));
+    }
+    for (var e = 1; e <= E; e++) { var v = valLoss(e, s); if (v < bestVal) { bestVal = v; best = e; } }
+    var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Training and validation loss over epochs" style="display:block;width:100%;max-width:' + W + 'px;height:auto;margin:0 auto">';
+    svg += '<rect x="0" y="0" width="' + W + '" height="' + H + '" rx="12" fill="var(--bg)"></rect>';
+    for (var g = 0; g <= 3; g++) {
+      var gy = Y(g).toFixed(1);
+      svg += '<line x1="' + L + '" y1="' + gy + '" x2="' + (W - R) + '" y2="' + gy + '" stroke="var(--line)" stroke-width="1"></line>';
+      svg += '<text x="' + (L - 8) + '" y="' + (+gy + 4) + '" text-anchor="end" class="svg-sub">' + g.toFixed(1) + '</text>';
+    }
+    var step = E > 10 ? 2 : 1;
+    for (var t = 0; t <= E; t += step) {
+      svg += '<text x="' + X(t).toFixed(1) + '" y="' + (H - B + 18) + '" text-anchor="middle" class="svg-sub">' + t + '</text>';
+    }
+    svg += '<text x="' + (L + pw / 2) + '" y="' + (H - 8) + '" text-anchor="middle" class="svg-text" font-size="12">epoch</text>';
+    svg += '<text x="14" y="' + (T + ph / 2) + '" text-anchor="middle" transform="rotate(-90 14 ' + (T + ph / 2) + ')" class="svg-text" font-size="12">loss</text>';
+    if (best < E) {
+      var bx = X(best).toFixed(1);
+      svg += '<rect x="' + bx + '" y="' + T + '" width="' + (X(E) - bx).toFixed(1) + '" height="' + ph + '" fill="var(--bad-soft)" opacity="0.55"></rect>';
+      svg += '<line x1="' + bx + '" y1="' + T + '" x2="' + bx + '" y2="' + (T + ph) + '" stroke="var(--good)" stroke-width="2" stroke-dasharray="6 4"></line>';
+      svg += '<text x="' + (+bx + 6) + '" y="' + (T + 14) + '" class="svg-text" font-size="12" fill="var(--good)">stop here (epoch ' + best + ')</text>';
+      svg += '<text x="' + (+bx + 6) + '" y="' + (T + 30) + '" class="svg-sub" fill="var(--bad)">overfitting zone</text>';
+    }
+    svg += '<polyline points="' + tr.join(' ') + '" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linejoin="round"></polyline>';
+    svg += '<polyline points="' + va.join(' ') + '" fill="none" stroke="var(--bad)" stroke-width="3" stroke-linejoin="round"></polyline>';
+    svg += '<rect x="' + (W - R - 190) + '" y="' + (T + ph - 52) + '" width="184" height="46" rx="8" fill="var(--surface)" stroke="var(--line)"></rect>';
+    svg += '<line x1="' + (W - R - 178) + '" y1="' + (T + ph - 36) + '" x2="' + (W - R - 150) + '" y2="' + (T + ph - 36) + '" stroke="var(--accent)" stroke-width="3"></line>';
+    svg += '<text x="' + (W - R - 142) + '" y="' + (T + ph - 32) + '" class="svg-sub" fill="var(--ink)">training loss</text>';
+    svg += '<line x1="' + (W - R - 178) + '" y1="' + (T + ph - 18) + '" x2="' + (W - R - 150) + '" y2="' + (T + ph - 18) + '" stroke="var(--bad)" stroke-width="3"></line>';
+    svg += '<text x="' + (W - R - 142) + '" y="' + (T + ph - 14) + '" class="svg-sub" fill="var(--ink)">validation loss</text>';
+    svg += '</svg>';
+    lcChart.innerHTML = svg;
+    var finalTr = trainLoss(E, s), finalVa = valLoss(E, s);
+    var verdict, vClass;
+    if (best < E) { verdict = 'overfitting after epoch ' + best; vClass = 'fail'; }
+    else if (finalVa > 1.2) { verdict = 'underfitting: still learning'; vClass = ''; }
+    else { verdict = 'stop about here'; vClass = 'pass'; }
+    lcOut.innerHTML =
+      '<div class="res"><div class="name">Best epoch</div><div class="val">' + best + '</div><div class="why">lowest validation loss</div></div>' +
+      '<div class="res"><div class="name">Final training loss</div><div class="val">' + finalTr.toFixed(2) + '</div><div class="why">on the training set</div></div>' +
+      '<div class="res ' + (finalVa > bestVal + 0.05 ? 'fail' : '') + '"><div class="name">Final validation loss</div><div class="val">' + finalVa.toFixed(2) + '</div><div class="why">on held-out examples</div></div>' +
+      '<div class="res ' + vClass + '"><div class="name">Verdict</div><div class="val" style="font-size:1rem">' + verdict + '</div><div class="why">what early stopping would do</div></div>';
+    var txt = '';
+    if (best < E) {
+      txt += 'Validation loss is lowest at epoch ' + best + ' and then climbs while training loss keeps falling. Everything in the shaded zone is overfitting: the model is memorising the training examples and getting worse on new ones. Early stopping keeps the version saved at epoch ' + best + ' and discards the rest. ';
+    } else if (finalVa > 1.2) {
+      txt += 'Both curves are still high and still falling after ' + E + ' epochs: the model has not learned the task yet (underfitting). Train longer, or raise the learning rate. ';
+    } else {
+      txt += 'After ' + E + ' epochs the validation loss is still at or near its lowest point. This is roughly where a careful run would stop; one or two more epochs would begin to overfit. ';
+    }
+    if (s.name === 'high') txt += 'The high learning rate makes the curves jumpy: each step is so large that it overshoots the best weights. It gets low fast, but it also starts overfitting after only a few epochs.';
+    if (s.name === 'low') txt += 'The low learning rate is slow and steady: it needs many epochs to get anywhere, and it overfits late. Safe, but expensive in training time.';
+    if (s.name === 'medium') txt += 'A medium learning rate is the usual compromise: smooth curves, a clear turning point, and a few epochs of useful learning before overfitting begins.';
+    lcText.textContent = txt;
+  }
+  if (lcE && lcL) { lcE.addEventListener('input', drawLoss); lcL.addEventListener('input', drawLoss); drawLoss(); }
+})();
+</script>
+<script>
+/* ---------- Shared behaviour for every guide (do not remove) ---------- */
+(function () {
+  var root = document.documentElement;
+  var btn = document.getElementById('themeBtn');
+  try { var saved = localStorage.getItem('llm-guides-theme'); if (saved) root.setAttribute('data-theme', saved); } catch (e) {}
+  btn.addEventListener('click', function () {
+    var isDark = root.getAttribute('data-theme') === 'dark' ||
+      (!root.getAttribute('data-theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    var next = isDark ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem('llm-guides-theme', next); } catch (e) {}
+  });
+
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    document.querySelectorAll('svg').forEach(function (s) { if (s.pauseAnimations) s.pauseAnimations(); });
+  }
+
+  var progress = document.getElementById('progress');
+  function onScroll() {
+    var h = document.documentElement;
+    var max = h.scrollHeight - h.clientHeight;
+    progress.style.width = (max > 0 ? (h.scrollTop / max) * 100 : 0) + '%';
+  }
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+
+  var links = Array.prototype.slice.call(document.querySelectorAll('#toc a'));
+  var sections = links.map(function (a) { return document.querySelector(a.getAttribute('href')); });
+  function setActive(id) {
+    links.forEach(function (a) {
+      var on = a.getAttribute('href') === '#' + id;
+      a.classList.toggle('active', on);
+      if (on && window.innerWidth < 1000 && a.scrollIntoView) {
+        a.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+      }
+    });
+  }
+  if ('IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) { if (en.isIntersecting) setActive(en.target.id); });
+    }, { rootMargin: '-30% 0px -60% 0px', threshold: 0 });
+    sections.forEach(function (s) { if (s) io.observe(s); });
+  }
+
+  /* Quiz engine: define window.QUIZ = [{q, opts:[...], a: indexOfCorrect, exp}] and a <div class="quiz" id="quiz"></div> */
+  var quiz = window.QUIZ || [];
+  var qEl = document.getElementById('quiz');
+  if (qEl && quiz.length) {
+    qEl.innerHTML = quiz.map(function (q, i) {
+      return '<div class="q" data-i="' + i + '"><div class="qt">' + (i + 1) + '. ' + q.q + '</div><div class="opts">' +
+        q.opts.map(function (o, j) { return '<button type="button" data-j="' + j + '">' + o + '</button>'; }).join('') +
+        '</div><div class="exp"></div></div>';
+    }).join('');
+    qEl.addEventListener('click', function (e) {
+      var b = e.target.closest('button'); if (!b) return;
+      var qBox = b.closest('.q'); var i = +qBox.dataset.i, j = +b.dataset.j;
+      var buttons = qBox.querySelectorAll('button');
+      buttons.forEach(function (x) { x.classList.remove('right', 'wrong'); });
+      if (j === quiz[i].a) { b.classList.add('right'); qBox.querySelector('.exp').textContent = 'Correct. ' + quiz[i].exp; }
+      else { b.classList.add('wrong'); buttons[quiz[i].a].classList.add('right'); qBox.querySelector('.exp').textContent = 'Not quite. ' + quiz[i].exp; }
+    });
+  }
+})();
+</script>
+</body>
+</html>
