@@ -316,6 +316,58 @@
   }
   .footer { color: var(--ink-3); font-size: .85rem; padding-top: 24px; border-top: 1px solid var(--line); margin-top: 40px; }
 </style>
+<style>
+  /* ---------- Series navigation (shared across all guides) ---------- */
+  .series { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: .82rem; color: var(--ink-3); }
+  .series a { color: var(--accent-ink); text-decoration: none; font-family: var(--display); font-weight: 700; }
+  .series a:hover { text-decoration: underline; }
+  .series .part { font-family: var(--mono); font-size: .72rem; background: var(--accent-soft); color: var(--accent-ink); padding: 2px 8px; border-radius: 999px; }
+  .pager { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 32px; }
+  .pager a { flex: 1 1 220px; text-decoration: none; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .pager a:hover { border-color: var(--accent); }
+  .pager a .dir { font-family: var(--mono); font-size: .7rem; color: var(--ink-3); text-transform: uppercase; letter-spacing: .08em; display: block; }
+  .pager a .t { font-family: var(--display); font-weight: 700; }
+  .pager a.next { text-align: right; }
+  /* Glossary term highlight in prose */
+  .term { border-bottom: 2px dotted var(--accent); cursor: help; }
+  /* Callout list inside cards */
+  .card ul, .card ol { padding-left: 1.1rem; margin: .3rem 0; font-size: .92rem; color: var(--ink-2); }
+  /* Slider fields */
+  .field input[type="range"] { padding: 0; height: 28px; accent-color: var(--accent); }
+  .field .val { font-family: var(--mono); font-size: .85rem; color: var(--accent-ink); }
+  /* Simple flow row diagram (HTML-based, wraps on phones) */
+  .flow { display: flex; align-items: stretch; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
+  .flow .node { flex: 1 1 140px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; min-width: 0; }
+  .flow .node h4 { margin: 0 0 4px; font-size: .95rem; }
+  .flow .node p { font-size: .85rem; color: var(--ink-2); margin: 0; }
+  .flow .node.hot { border-color: var(--accent); background: var(--accent-soft); }
+  .flow .arrow { align-self: center; color: var(--ink-3); font-size: 1.2rem; }
+  /* Chat message mock */
+  .chat { display: grid; gap: 8px; margin: 14px 0; max-width: 70ch; }
+  .msg { border-radius: 12px; padding: 10px 14px; font-size: .93rem; border: 1px solid var(--line); background: var(--surface); }
+  .msg .who { font-family: var(--display); font-weight: 700; font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; display: block; margin-bottom: 2px; }
+  .msg.system { background: var(--surface-2); }
+  .msg.system .who { color: var(--ink-3); }
+  .msg.user { background: var(--accent-soft); border-color: transparent; }
+  .msg.user .who { color: var(--accent-ink); }
+  .msg.assistant { background: var(--good-soft); border-color: transparent; }
+  .msg.assistant .who { color: var(--good); }
+  .msg.tool { background: var(--judge-soft); border-color: transparent; font-family: var(--mono); font-size: .82rem; }
+  .msg.tool .who { color: var(--judge); font-family: var(--display); }
+  .msg.danger { background: var(--bad-soft); border-color: transparent; }
+  .msg.danger .who { color: var(--bad); }
+  /* Bars for probability / comparison demos */
+  .bars { display: grid; gap: 6px; margin-top: 10px; }
+  .bar-row { display: grid; grid-template-columns: 110px 1fr 56px; gap: 8px; align-items: center; font-size: .85rem; }
+  .bar-row .lbl { font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bar-row .track { height: 14px; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
+  .bar-row .fill { height: 100%; background: var(--accent); border-radius: 999px; transition: width .25s ease; }
+  .bar-row .pct { font-family: var(--mono); text-align: right; font-variant-numeric: tabular-nums; }
+  /* Comparison table highlight */
+  td.yes { color: var(--good); font-weight: 700; }
+  td.no { color: var(--bad); font-weight: 700; }
+  td.mid { color: var(--judge); font-weight: 700; }
+</style>
 </head>
 <body>
 <div class="progress" id="progress"></div>
@@ -340,7 +392,7 @@
 
   <main>
     <div class="topbar">
-      <span class="brand">Eval Explained</span>
+      <div class="series"><a href="index.html">LLM Study Guides</a><span class="part">Part 5 of 8</span><span>Eval Explained</span></div>
       <button class="theme-btn" id="themeBtn" type="button" aria-label="Toggle dark mode">Toggle theme</button>
     </div>
 
@@ -1070,37 +1122,54 @@ print(f<span class="st">"accuracy = {accuracy:.0%}  ({len(results)} items)"</spa
 
       <h3>Glossary</h3>
       <dl class="gloss">
-        <dt>Eval</dt><dd>A repeatable test that measures how well a model or app does a job.</dd>
-        <dt>Dataset / eval set</dt><dd>The list of test inputs, usually with expected outputs.</dd>
-        <dt>Ground truth / reference</dt><dd>The expected, correct answer for an item.</dd>
-        <dt>Grader / scorer</dt><dd>The rule or model that scores one output.</dd>
-        <dt>Metric</dt><dd>A summary number over the whole dataset (accuracy, F1, win rate).</dd>
-        <dt>Rubric</dt><dd>A written checklist of what a good answer must have. Used by human and LLM judges.</dd>
-        <dt>LLM-as-a-judge</dt><dd>Using a strong model to grade another model's output.</dd>
-        <dt>Pairwise</dt><dd>Comparing two outputs and picking the better one, instead of scoring each alone.</dd>
-        <dt>Benchmark</dt><dd>A public, fixed eval that lets different models be compared.</dd>
-        <dt>Leaderboard</dt><dd>A ranked table of benchmark results.</dd>
-        <dt>Contamination</dt><dd>Test questions ending up in the training data, inflating scores.</dd>
-        <dt>Saturation</dt><dd>When most models score near the top and the benchmark stops discriminating.</dd>
-        <dt>Regression</dt><dd>Something that used to work and now fails after a change.</dd>
-        <dt>Held-out set</dt><dd>Items you keep hidden while tuning, to check you did not overfit.</dd>
-        <dt>Temperature</dt><dd>A setting for randomness. 0 is most deterministic.</dd>
-        <dt>pass@k</dt><dd>Fraction of items solved in at least one of k attempts.</dd>
-        <dt>Precision / recall / F1</dt><dd>False-alarm rate, miss rate, and their balance. See the fishing net.</dd>
-        <dt>Hallucination</dt><dd>A fluent but false statement produced by the model.</dd>
-        <dt>RAG</dt><dd>Retrieval-augmented generation: search documents first, then answer using them.</dd>
         <dt>Agent</dt><dd>An LLM that takes multiple steps and uses tools to complete a task.</dd>
+        <dt>Benchmark</dt><dd>A public, fixed eval that lets different models be compared.</dd>
+        <dt>BLEU / ROUGE</dt><dd>Older overlap metrics that count shared words between an output and a reference. BLEU is used for translation, ROUGE for summaries.</dd>
+        <dt>Chain-of-thought</dt><dd>Asking the model to reason step by step before answering. Changes scores a lot, so eval settings must say whether it was used.</dd>
+        <dt>Confusion matrix</dt><dd>The 2 by 2 table of true positives, false positives, false negatives, and true negatives that precision and recall are computed from.</dd>
+        <dt>Contamination</dt><dd>Test questions ending up in the training data, inflating scores.</dd>
+        <dt>Dataset / eval set</dt><dd>The list of test inputs, usually with expected outputs.</dd>
+        <dt>Elo / Bradley-Terry</dt><dd>Rating systems that turn many pairwise wins and losses into one ranking number, as in chess.</dd>
+        <dt>Embedding</dt><dd>A list of numbers that captures the meaning of a text, so similar meanings land close together. Used for semantic-similarity grading.</dd>
         <dt>Error analysis</dt><dd>Reading the failed items to find patterns worth fixing.</dd>
+        <dt>Eval</dt><dd>A repeatable test that measures how well a model or app does a job.</dd>
+        <dt>Few-shot / zero-shot</dt><dd>Whether the prompt includes a few worked examples (few-shot) or none (zero-shot). Both are eval settings that must be reported.</dd>
+        <dt>Goodhart's law</dt><dd>"When a measure becomes a target, it stops being a good measure." Optimising hard for one metric makes the model game it.</dd>
+        <dt>Grader / scorer</dt><dd>The rule or model that scores one output.</dd>
+        <dt>Ground truth / reference</dt><dd>The expected, correct answer for an item.</dd>
+        <dt>Hallucination</dt><dd>A fluent but false statement produced by the model.</dd>
+        <dt>Harness</dt><dd>The code that runs the whole eval pipeline: loads the dataset, calls the model, grades, and reports.</dd>
+        <dt>Held-out set</dt><dd>Items you keep hidden while tuning, to check you did not overfit.</dd>
+        <dt>Leaderboard</dt><dd>A ranked table of benchmark results.</dd>
+        <dt>LLM-as-a-judge</dt><dd>Using a strong model to grade another model's output.</dd>
+        <dt>Metric</dt><dd>A summary number over the whole dataset (accuracy, F1, win rate).</dd>
         <dt>Offline / online eval</dt><dd>Testing on a fixed set before shipping, versus measuring on live traffic after.</dd>
+        <dt>Pairwise</dt><dd>Comparing two outputs and picking the better one, instead of scoring each alone.</dd>
+        <dt>pass@k</dt><dd>Fraction of items solved in at least one of k attempts.</dd>
+        <dt>Position bias</dt><dd>An LLM judge's habit of preferring whichever answer is shown first.</dd>
+        <dt>Precision / recall / F1</dt><dd>False-alarm rate, miss rate, and their balance. See the fishing net.</dd>
+        <dt>RAG</dt><dd>Retrieval-augmented generation: search documents first, then answer using them.</dd>
+        <dt>Regression</dt><dd>Something that used to work and now fails after a change.</dd>
+        <dt>Rubric</dt><dd>A written checklist of what a good answer must have. Used by human and LLM judges.</dd>
+        <dt>Saturation</dt><dd>When most models score near the top and the benchmark stops discriminating.</dd>
+        <dt>Temperature</dt><dd>A setting for randomness. 0 is most deterministic.</dd>
+        <dt>Token</dt><dd>The unit a model reads and writes, roughly three quarters of an English word. Eval cost and latency are counted in tokens.</dd>
+        <dt>Verbosity bias</dt><dd>An LLM judge's habit of preferring longer answers even when they are not better.</dd>
+        <dt>Vibe check</dt><dd>Trying a few questions by hand and judging by feel. Useful for first impressions, not a substitute for an eval.</dd>
+        <dt>Win rate</dt><dd>From pairwise judging: how often one model's answer beat the other's.</dd>
       </dl>
 
       <div class="box tip">
         <span class="label">Where to go next</span>
-        <p>You now know more than most people who use the word "eval". The best next step is practical: pick one thing you use an LLM for, write 20 inputs and expected outputs, run the script from Step 10, and read the failures. Everything deeper (statistics of judges, agent trajectories, safety red-teaming) builds on that habit.</p>
+        <p>You now know more than most people who use the word "eval". The best next step is practical: pick one thing you use an LLM for, write 20 inputs and expected outputs, run the script from Step 10, and read the failures. Everything deeper (statistics of judges, agent trajectories, safety red-teaming) builds on that habit. Next in the series: <a href="06-fine-tuning.html">Fine-Tuning</a>, which explains when training a model on your own data is worth it.</p>
       </div>
     </section>
 
-    <footer class="footer">Eval Explained. A plain-language guide to LLM evaluation. Numbers in the tables are rounded rules of thumb, not exact citations.</footer>
+    <div class="pager">
+      <a class="prev" href="04-tools-and-agents.html"><span class="dir">Previous</span><span class="t">Tools and Agents</span></a>
+      <a class="next" href="06-fine-tuning.html"><span class="dir">Next</span><span class="t">Fine-Tuning</span></a>
+    </div>
+    <footer class="footer">Eval Explained, part 5 of the LLM Study Guides. Written in plain language for beginners. Numbers in the tables are rounded rules of thumb, not exact citations.</footer>
   </main>
 </div>
 
@@ -1109,13 +1178,13 @@ print(f<span class="st">"accuracy = {accuracy:.0%}  ({len(results)} items)"</spa
   // ---------- Theme toggle ----------
   var root = document.documentElement;
   var btn = document.getElementById('themeBtn');
-  try { var saved = localStorage.getItem('eval-theme'); if (saved) root.setAttribute('data-theme', saved); } catch (e) {}
+  try { var saved = localStorage.getItem('llm-guides-theme'); if (saved) root.setAttribute('data-theme', saved); } catch (e) {}
   btn.addEventListener('click', function () {
     var isDark = root.getAttribute('data-theme') === 'dark' ||
       (!root.getAttribute('data-theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
     var next = isDark ? 'light' : 'dark';
     root.setAttribute('data-theme', next);
-    try { localStorage.setItem('eval-theme', next); } catch (e) {}
+    try { localStorage.setItem('llm-guides-theme', next); } catch (e) {}
   });
 
   // ---------- Reduced motion: pause SVG animations ----------
